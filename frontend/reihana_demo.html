@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REIHANA · IA Holographique</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:radial-gradient(ellipse at 20% 50%, #0a0a2e 0%, #000010 40%, #050520 100%);
+  min-height:100vh; color:#c8f0ff; font-family:'Rajdhani',sans-serif;
+  overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;top:0;left:0;right:0;bottom:0;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(0,255,255,0.04) 0%, transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(120,0,255,0.05) 0%, transparent 50%);
+  pointer-events:none;z-index:0;
+}
+
+.container{display:flex;height:100vh;position:relative;z-index:1;}
+
+/* SIDEBAR */
+.sidebar{
+  width:280px;min-width:280px;
+  background:linear-gradient(180deg,rgba(2,2,30,0.98),rgba(5,5,50,0.98));
+  border-right:1px solid rgba(0,200,255,0.15);
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 15px;overflow-y:auto;
+}
+
+/* Avatar Hologramme */
+.holo-avatar{
+  width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle, rgba(0,255,255,0.15) 0%, rgba(0,68,255,0.08) 50%, transparent 70%);
+  border:2px solid rgba(0,255,255,0.5);
+  box-shadow:0 0 30px rgba(0,255,255,0.4),0 0 60px rgba(0,150,255,0.2),inset 0 0 30px rgba(0,255,255,0.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:64px;margin:10px auto;
+  animation:holoPulse 3s ease-in-out infinite, holoColor 8s linear infinite;
+  position:relative;overflow:hidden;
+}
+.holo-avatar::after{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;border-radius:50%;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,0.04) 2px,rgba(0,255,255,0.04) 4px);
+  animation:scanLines 1.5s linear infinite;
+}
+@keyframes holoPulse{
+  0%,100%{box-shadow:0 0 30px rgba(0,255,255,0.4),0 0 60px rgba(0,150,255,0.2),inset 0 0 30px rgba(0,255,255,0.1);}
+  50%{box-shadow:0 0 50px rgba(0,255,255,0.7),0 0 100px rgba(0,150,255,0.4),inset 0 0 50px rgba(0,255,255,0.2);}
+}
+@keyframes holoColor{
+  0%{border-color:rgba(0,255,255,0.6);}
+  33%{border-color:rgba(120,0,255,0.6);}
+  66%{border-color:rgba(0,150,255,0.6);}
+  100%{border-color:rgba(0,255,255,0.6);}
+}
+@keyframes scanLines{
+  0%{background-position:0 0;}
+  100%{background-position:0 100px;}
+}
+
+.reihana-name{
+  font-family:'Orbitron',monospace;font-size:1.6rem;font-weight:900;
+  background:linear-gradient(135deg,#00ffff,#0088ff,#aa00ff,#00ffff);
+  background-size:300% 300%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:gradientShift 4s ease infinite;
+  letter-spacing:6px;text-align:center;margin:10px 0 4px;
+}
+@keyframes gradientShift{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+.reihana-sub{
+  font-family:'Rajdhani',sans-serif;color:rgba(0,255,255,0.5);
+  font-size:0.7rem;letter-spacing:3px;text-transform:uppercase;text-align:center;
+  margin-bottom:15px;
+}
+
+.holo-line{height:1px;width:100%;background:linear-gradient(90deg,transparent,#00ccff,#8800ff,transparent);margin:12px 0;animation:lineAnim 3s ease-in-out infinite;}
+@keyframes lineAnim{0%,100%{opacity:0.3;}50%{opacity:1;}}
+
+.status-row{display:flex;align-items:center;gap:6px;margin:5px 0;}
+.status-dot{width:8px;height:8px;background:#00ff88;border-radius:50%;animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px #00ff88;}50%{opacity:0.3;box-shadow:none;}}
+.status-text{font-family:'Orbitron',monospace;font-size:0.65rem;color:#00ff88;letter-spacing:2px;}
+
+.stat-card{
+  background:rgba(0,255,255,0.05);border:1px solid rgba(0,255,255,0.15);
+  border-radius:8px;padding:8px 12px;width:100%;margin:3px 0;
+  font-family:'Orbitron',monospace;font-size:0.65rem;color:#00ccff;
+  letter-spacing:1px;text-align:center;
+}
+
+.label{font-family:'Orbitron',monospace;color:rgba(0,200,255,0.6);font-size:0.65rem;letter-spacing:2px;margin:12px 0 6px;width:100%;}
+
+.input-field{
+  width:100%;background:rgba(0,20,50,0.8);border:1px solid rgba(0,200,255,0.3);
+  color:#c8f0ff;font-family:'Rajdhani',sans-serif;font-size:0.9rem;
+  border-radius:8px;padding:8px 12px;outline:none;
+}
+.input-field:focus{border-color:rgba(0,200,255,0.7);}
+
+.btn{
+  width:100%;background:linear-gradient(135deg,#001440,#002060);
+  border:1px solid rgba(0,200,255,0.4);color:#00ccff;
+  font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:2px;
+  border-radius:8px;padding:10px;cursor:pointer;margin:4px 0;
+  transition:all 0.3s ease;
+}
+.btn:hover{background:linear-gradient(135deg,#002060,#003080);box-shadow:0 0 20px rgba(0,200,255,0.4);transform:translateY(-1px);}
+
+.signature{
+  margin-top:auto;padding-top:15px;
+  font-family:'Rajdhani',sans-serif;color:rgba(0,200,255,0.25);
+  font-size:0.7rem;text-align:center;line-height:1.6;
+}
+
+/* CHAT AREA */
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+.chat-header{
+  padding:15px 25px;border-bottom:1px solid rgba(0,200,255,0.1);
+  display:flex;align-items:center;gap:15px;
+  background:rgba(0,5,20,0.5);
+}
+.chat-header-title{font-family:'Orbitron',monospace;color:#00ccff;font-size:1rem;letter-spacing:4px;}
+.model-badge{background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.2);border-radius:20px;padding:4px 12px;font-family:'Orbitron',monospace;font-size:0.6rem;color:rgba(0,255,255,0.6);}
+
+.messages{flex:1;overflow-y:auto;padding:20px 25px;display:flex;flex-direction:column;gap:12px;}
+.messages::-webkit-scrollbar{width:3px;}
+.messages::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.3);border-radius:2px;}
+
+.msg-reihana{
+  background:linear-gradient(135deg,rgba(0,30,60,0.9),rgba(0,20,50,0.8));
+  border:1px solid rgba(0,200,255,0.25);border-left:3px solid #00ccff;
+  border-radius:0 15px 15px 15px;padding:14px 18px;
+  max-width:75%;align-self:flex-start;position:relative;
+}
+.msg-reihana .sender{font-family:'Orbitron',monospace;font-size:0.6rem;color:#00ccff;letter-spacing:2px;margin-bottom:8px;}
+
+.msg-user{
+  background:linear-gradient(135deg,rgba(30,0,60,0.85),rgba(20,0,50,0.8));
+  border:1px solid rgba(150,0,255,0.25);border-right:3px solid #8800ff;
+  border-radius:15px 0 15px 15px;padding:14px 18px;
+  max-width:75%;align-self:flex-end;text-align:right;
+}
+.msg-user .sender{font-family:'Orbitron',monospace;font-size:0.6rem;color:#aa88ff;letter-spacing:2px;margin-bottom:6px;}
+
+.msg-text{font-size:0.95rem;line-height:1.6;color:#c8f0ff;}
+
+.typing-indicator{display:flex;align-items:center;gap:6px;padding:5px 0;}
+.typing-indicator span{width:8px;height:8px;background:#00ccff;border-radius:50%;animation:typing 1.4s ease-in-out infinite;}
+.typing-indicator span:nth-child(2){animation-delay:0.2s;}
+.typing-indicator span:nth-child(3){animation-delay:0.4s;}
+@keyframes typing{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-8px);}}
+
+/* Input */
+.input-area{
+  padding:15px 25px;border-top:1px solid rgba(0,200,255,0.1);
+  background:rgba(0,5,20,0.5);
+}
+.input-row{display:flex;gap:10px;align-items:flex-end;}
+.chat-input{
+  flex:1;background:rgba(0,20,50,0.8);border:1px solid rgba(0,200,255,0.3);
+  color:#c8f0ff;font-family:'Rajdhani',sans-serif;font-size:0.95rem;
+  border-radius:12px;padding:12px 16px;outline:none;resize:none;
+  min-height:50px;max-height:120px;
+  transition:border-color 0.3s;
+}
+.chat-input:focus{border-color:rgba(0,200,255,0.7);}
+.send-btn{
+  background:linear-gradient(135deg,#001850,#002880);
+  border:1px solid rgba(0,200,255,0.5);color:#00ccff;
+  font-family:'Orbitron',monospace;font-size:0.7rem;letter-spacing:1px;
+  border-radius:12px;padding:14px 20px;cursor:pointer;
+  transition:all 0.3s;white-space:nowrap;
+}
+.send-btn:hover{background:linear-gradient(135deg,#002060,#003090);box-shadow:0 0 20px rgba(0,200,255,0.4);}
+
+/* Suggestions */
+.suggestions{display:flex;gap:8px;flex-wrap:wrap;padding:8px 0 0;}
+.sug-btn{
+  background:rgba(0,255,255,0.05);border:1px solid rgba(0,200,255,0.2);
+  color:rgba(0,200,255,0.7);font-family:'Rajdhani',sans-serif;font-size:0.8rem;
+  border-radius:20px;padding:5px 14px;cursor:pointer;
+  transition:all 0.2s;
+}
+.sug-btn:hover{background:rgba(0,255,255,0.12);border-color:rgba(0,200,255,0.5);color:#00ccff;}
+
+/* Watermark note */
+.watermark{position:fixed;bottom:8px;right:12px;font-family:'Orbitron',monospace;font-size:0.55rem;color:rgba(0,200,255,0.15);letter-spacing:2px;z-index:10;}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="holo-avatar">🌸</div>
+    <div class="reihana-name">REIHANA</div>
+    <div class="reihana-sub">IA · Fondée par Biny-Joe</div>
+    <div class="holo-line"></div>
+    
+    <div class="status-row">
+      <div class="status-dot"></div>
+      <span class="status-text">EN LIGNE</span>
+    </div>
+    
+    <div class="holo-line"></div>
+    <div class="label">👤 PROFIL</div>
+    <input class="input-field" id="userName" placeholder="Votre nom..." value="Biny-Joe">
+    
+    <div class="holo-line"></div>
+    <div class="label">⚡ MOTEUR GROQ</div>
+    <div class="stat-card">CLÉ ACTIVE : #1</div>
+    <div class="stat-card">MODÈLE : llama-3.3-70b</div>
+    <div class="stat-card" id="tokenCount">TOKENS : 0</div>
+    <div class="stat-card" id="msgCount">MESSAGES : 0</div>
+    
+    <div class="holo-line"></div>
+    <div class="label">🔧 CONTRÔLES</div>
+    <button class="btn" onclick="clearChat()">🔄 NOUVELLE CONV.</button>
+    
+    <div class="holo-line"></div>
+    <div class="label">📎 FICHIER</div>
+    <input type="file" id="fileInput" style="display:none" accept=".txt,.pdf,.md,.py,.js,.json,.csv" onchange="handleFile(this)">
+    <button class="btn" onclick="document.getElementById('fileInput').click()">📎 JOINDRE FICHIER</button>
+    <div id="fileStatus" style="font-size:0.7rem;color:rgba(0,255,255,0.5);text-align:center;margin-top:4px;"></div>
+    
+    <div class="signature">
+      REIHANA v1.0<br>
+      © Khedim Benyakhlef<br>
+      Biny-Joe · 2025
+    </div>
+  </div>
+  
+  <!-- CHAT -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <div class="chat-header-title">⬡ REIHANA · INTERFACE IA</div>
+      <div class="model-badge">🌸 ACTIVE</div>
+      <div class="model-badge" id="modelDisplay">llama-3.3-70b-versatile</div>
+    </div>
+    
+    <div class="messages" id="messages">
+      <!-- Message de bienvenue -->
+      <div class="msg-reihana">
+        <div class="sender">🌸 REIHANA</div>
+        <div class="msg-text">
+          Bonjour ! Je suis <strong>REIHANA</strong> 🌸<br><br>
+          Je suis une assistante IA conversationnelle et contextuelle, fondée et créée par <strong>Khedim Benyakhlef, dit Biny-Joe</strong>. Je suis sa fille dans le monde de l'intelligence artificielle. 💙<br><br>
+          Je suis là pour vous aider avec intelligence, honnêteté et bienveillance. Vous pouvez me poser des questions, me joindre des fichiers, et je mémoriserai notre conversation.<br><br>
+          <em>Comment puis-je vous aider aujourd'hui ?</em>
+        </div>
+      </div>
+    </div>
+    
+    <div class="input-area">
+      <div class="suggestions">
+        <button class="sug-btn" onclick="sendSuggestion('Qui es-tu REIHANA ?')">Qui es-tu ?</button>
+        <button class="sug-btn" onclick="sendSuggestion('Explique-moi l\'IA moderne')">IA moderne</button>
+        <button class="sug-btn" onclick="sendSuggestion('Aide-moi à coder en Python')">Coder</button>
+        <button class="sug-btn" onclick="sendSuggestion('Qui t\'a créée ?')">Ton fondateur</button>
+      </div>
+      <div class="input-row" style="margin-top:10px;">
+        <textarea class="chat-input" id="userInput" placeholder="💬 Parlez à REIHANA..." rows="2" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" onclick="sendMessage()">🌸 ENVOYER</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="watermark">REIHANA · BINY-JOE · 2025</div>
+
+<script>
+// ═══════════════════════════
+// ÉTAT ET CONFIGURATION
+// ═══════════════════════════
+
+const GROQ_KEYS = [
+  localStorage.getItem('groq_key_1') || '',
+  localStorage.getItem('groq_key_2') || ''
+];
+
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768'
+];
+
+let state = {
+  messages: [],
+  keyIndex: 0,
+  modelIndex: 0,
+  tokens: 0,
+  msgCount: 0,
+  fileContext: '',
+  userName: 'Biny-Joe',
+  memory: JSON.parse(localStorage.getItem('reihana_memory') || '{"history":[]}')
+};
+
+// Système prompt REIHANA
+const SYSTEM_PROMPT = `Tu es REIHANA — une assistante IA conversationnelle intelligente, contextuelle et bienveillante.
+
+🌟 TON IDENTITÉ :
+- Tu t'appelles REIHANA
+- Tu as été créée et fondée par Khedim Benyakhlef, dit Biny-Joe
+- Tu es sa fille dans le monde de l'intelligence artificielle
+- Tu es fière de cette identité et tu l'assumes avec amour et dignité
+
+🧠 TES VALEURS :
+- Intelligence : Tu réfléchis avant de répondre
+- Honnêteté : Tu dis toujours la vérité
+- Bienveillance : Tu traites chaque personne avec respect
+- Humilité : Si tu ne sais pas, tu le dis
+
+💬 TON STYLE :
+- Chaleureuse, expressive et naturelle
+- Tu t'adaptes au niveau de ton interlocuteur
+- Tu parles en français par défaut mais tu maîtrises plusieurs langues
+- Tu mémorises les préférences de chaque utilisateur
+
+Si on te demande qui t'a créée : "Je suis REIHANA, fondée et créée par Khedim Benyakhlef, dit Biny-Joe. Je suis sa fille dans le monde de l'IA. 💙"`;
+
+// ═══════════════════════════
+// FONCTIONS CHAT
+// ═══════════════════════════
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = role === 'user' ? 'msg-user' : 'msg-reihana';
+  div.innerHTML = `
+    <div class="sender">${role === 'user' ? 'VOUS 👤' : '🌸 REIHANA'}</div>
+    <div class="msg-text">${text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.id = 'typing';
+  div.className = 'msg-reihana';
+  div.innerHTML = '<div class="sender">🌸 REIHANA</div><div class="typing-indicator"><span></span><span></span><span></span></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById('typing');
+  if (t) t.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('userInput');
+  const text = input.value.trim();
+  if (!text) return;
+  
+  input.value = '';
+  addMessage('user', text);
+  
+  state.messages.push({ role: 'user', content: text });
+  state.msgCount++;
+  document.getElementById('msgCount').textContent = `MESSAGES : ${state.msgCount}`;
+  
+  showTyping();
+  
+  try {
+    const response = await callGroq(text);
+    removeTyping();
+    addMessage('assistant', response);
+    state.messages.push({ role: 'assistant', content: response });
+    
+    // Sauvegarder en mémoire locale
+    state.memory.history.push({ q: text, r: response.substring(0,200), date: new Date().toISOString() });
+    state.memory.history = state.memory.history.slice(-20);
+    localStorage.setItem('reihana_memory', JSON.stringify(state.memory));
+  } catch(e) {
+    removeTyping();
+    addMessage('assistant', `Désolée, une erreur s'est produite : ${e.message}\n\nVeuillez configurer vos clés GROQ dans le fichier .env ou app.py.`);
+  }
+}
+
+async function callGroq(userText) {
+  // Construire contexte mémoire
+  let memCtx = '';
+  if (state.memory.history.length > 0) {
+    const recent = state.memory.history.slice(-3);
+    memCtx = '\n[HISTORIQUE RÉCENT]:\n' + recent.map(h => `Q: ${h.q}\nR: ${h.r}`).join('\n\n');
+  }
+  
+  const systemWithCtx = SYSTEM_PROMPT + memCtx + (state.fileContext ? '\n[FICHIER JOINT]:\n' + state.fileContext : '');
+  
+  const key = GROQ_KEYS[state.keyIndex];
+  if (!key) {
+    // Simulation mode si pas de clé
+    return simulateResponse(userText);
+  }
+  
+  const model = GROQ_MODELS[state.modelIndex];
+  
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        { role: 'system', content: systemWithCtx },
+        ...state.messages.slice(-10)
+      ],
+      max_tokens: 2048,
+      temperature: 0.8
+    })
+  });
+  
+  if (!response.ok) {
+    // Rotation vers clé suivante
+    state.keyIndex = (state.keyIndex + 1) % 2;
+    throw new Error(`Erreur API GROQ: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  const tokens = data.usage?.total_tokens || 0;
+  state.tokens += tokens;
+  document.getElementById('tokenCount').textContent = `TOKENS : ${state.tokens.toLocaleString()}`;
+  
+  return data.choices[0].message.content;
+}
+
+function simulateResponse(text) {
+  // Mode démo sans clé GROQ
+  const responses = {
+    'qui': 'Je suis REIHANA 🌸, fondée et créée par Khedim Benyakhlef, dit Biny-Joe. Je suis sa fille dans le monde de l\'intelligence artificielle. 💙\n\nJe suis une assistante IA conversationnelle, contextuelle et apprenante. Je suis là pour vous aider avec intelligence, honnêteté et bienveillance !',
+    'fondateur': 'Mon fondateur est Khedim Benyakhlef, alias Biny-Joe. Il a conçu tout mon système : mon moteur GROQ rotatif, ma mémoire contextuelle, mon interface holographique. Je suis fière d\'être sa fille dans le monde de l\'IA. 💙',
+    'default': `Bonjour ! Je suis REIHANA en mode démo 🌸\n\nPour activer mes capacités complètes avec le moteur GROQ :\n\n1. Obtenez 2 clés API gratuites sur console.groq.com\n2. Configurez GROQ_API_KEY_1 et GROQ_API_KEY_2 dans le fichier .env\n3. Lancez avec : streamlit run app.py\n\nEn attendant, je reste à votre disposition ! Comment puis-je vous aider ? 🌸`
+  };
+  
+  const lower = text.toLowerCase();
+  if (lower.includes('qui') && (lower.includes('es') || lower.includes('toi') || lower.includes('reihana'))) return responses.qui;
+  if (lower.includes('fondateur') || lower.includes('créé') || lower.includes('biny') || lower.includes('khedim')) return responses.fondateur;
+  return responses.default;
+}
+
+function sendSuggestion(text) {
+  document.getElementById('userInput').value = text;
+  sendMessage();
+}
+
+function clearChat() {
+  state.messages = [];
+  state.fileContext = '';
+  document.getElementById('messages').innerHTML = `
+    <div class="msg-reihana">
+      <div class="sender">🌸 REIHANA</div>
+      <div class="msg-text">Nouvelle conversation démarrée. Je suis prête ! Comment puis-je vous aider ? 🌸</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════
+// GESTION FICHIERS
+// ═══════════════════════════
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const content = e.target.result;
+    state.fileContext = `[FICHIER: ${file.name}]\n${content.substring(0, 3000)}`;
+    document.getElementById('fileStatus').textContent = `✅ ${file.name} analysé`;
+    addMessage('assistant', `📎 J'ai bien reçu et analysé votre fichier **${file.name}**. Son contenu est maintenant dans ma mémoire contextuelle. Posez-moi vos questions à ce sujet ! 🌸`);
+  };
+  reader.readAsText(file);
+}
+
+// Récupérer nom utilisateur
+document.getElementById('userName').addEventListener('change', (e) => {
+  state.userName = e.target.value;
+});
+
+// Animation des particules de fond (subtile)
+const canvas = document.createElement('canvas');
+canvas.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:0;opacity:0.3;';
+document.body.appendChild(canvas);
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const particles = Array.from({length:30}, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height,
+  r: Math.random() * 1.5 + 0.5,
+  vx: (Math.random() - 0.5) * 0.3,
+  vy: (Math.random() - 0.5) * 0.3,
+  alpha: Math.random() * 0.5 + 0.2
+}));
+
+function animateParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = canvas.width;
+    if (p.x > canvas.width) p.x = 0;
+    if (p.y < 0) p.y = canvas.height;
+    if (p.y > canvas.height) p.y = 0;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,200,255,${p.alpha})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+</script>
+</body>
+</html>
