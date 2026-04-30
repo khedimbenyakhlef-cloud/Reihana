@@ -2,14 +2,6 @@
 REIHANA - Application Principale Streamlit v2.0
 Interface holographique + IA conversationnelle
 Fondée par Khedim Benyakhlef (Biny-Joe)
-
-NOUVEAUTÉS v2.0 :
-  ✅ Champ de texte qui se vide après envoi
-  ✅ Voix de jeune fille (Web Speech API - voix fr-FR)
-  ✅ Hologramme animé bouche qui bouge pendant la parole
-  ✅ Boutons ❤️ J'aime / 📋 Copier / 🔄 Régénérer sous chaque réponse
-  ✅ Recherche web (DuckDuckGo gratuit)
-  ✅ Mode Deep Think (réflexion longue)
 """
 
 import streamlit as st
@@ -19,17 +11,12 @@ import json
 import time
 import tempfile
 import requests
-import html                           # ← AJOUTÉ
+import html
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote_plus
 
-# Ajouter le backend au path
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
-
-# ═══════════════════════════════════════════════
-# CONFIGURATION PAGE
-# ═══════════════════════════════════════════════
 
 st.set_page_config(
     page_title="REIHANA • IA",
@@ -37,10 +24,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# ═══════════════════════════════════════════════
-# CSS HOLOGRAPHIQUE (inchangé)
-# ═══════════════════════════════════════════════
 
 st.markdown("""
 <style>
@@ -54,7 +37,7 @@ st.markdown("""
     content: '';
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background:
+    background: 
         radial-gradient(circle at 10% 20%, rgba(0,255,255,0.03) 0%, transparent 50%),
         radial-gradient(circle at 90% 80%, rgba(120,0,255,0.05) 0%, transparent 50%),
         radial-gradient(circle at 50% 50%, rgba(0,150,255,0.02) 0%, transparent 70%);
@@ -170,73 +153,42 @@ section[data-testid="stSidebar"] { background: linear-gradient(180deg, #020218, 
 </style>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════
-# JAVASCRIPT CORRIGÉ (voix + boutons stables)
-# ═══════════════════════════════════════════════
-
 st.markdown("""
 <script>
-// Chargement des voix au chargement de la page
-window._reihanaBestVoice = null;
-(async function initVoice() {
-    let voices = speechSynthesis.getVoices();
-    if (voices.length === 0) {
-        await new Promise(resolve => {
-            speechSynthesis.addEventListener('voiceschanged', () => resolve(), { once: true });
-        });
-        voices = speechSynthesis.getVoices();
-    }
-    const preferred = [
-        'Google français', 'Microsoft Julie', 'Microsoft Hortense',
-        'Amelie', 'Thomas', 'fr-FR-DeniseNeural', 'fr-FR-EloiseNeural'
-    ];
-    for (let name of preferred) {
-        let v = voices.find(v => v.name.includes(name) && v.lang.startsWith('fr'));
-        if (v) { window._reihanaBestVoice = v; return; }
-    }
-    window._reihanaBestVoice = voices.find(v => v.lang === 'fr-FR') || voices.find(v => v.lang.startsWith('fr')) || voices[0];
-})();
-
 window.reihanaLike = function(btn) {
     btn.classList.toggle('liked');
-    btn.textContent = btn.classList.contains('liked') ? '❤️ Aimé' : '❤️ J\\'aime';
+    btn.textContent = btn.classList.contains('liked') ? '❤️ Aimé' : '❤️ J\'aime';
 };
 
-window.reihanaCopyFrom = function(btn) {
-    const text = btn.getAttribute('data-text');
-    navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.textContent;
+window.reihanaCopy = function(btn) {
+    var text = btn.getAttribute('data-text');
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = btn.textContent;
         btn.textContent = '✅ Copié !';
-        setTimeout(() => btn.textContent = orig, 1500);
+        setTimeout(function() { btn.textContent = orig; }, 1500);
     });
 };
 
-window.reihanaSayFrom = function(btn) {
-    const text = btn.getAttribute('data-text');
+window.reihanaSay = function(btn) {
+    var text = btn.getAttribute('data-text');
     if (speechSynthesis.speaking) {
         speechSynthesis.cancel();
         btn.textContent = '🔊 Écouter';
         return;
     }
-    const utter = new SpeechSynthesisUtterance(text);
-    if (window._reihanaBestVoice) utter.voice = window._reihanaBestVoice;
+    var utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'fr-FR';
     utter.rate = 1.05;
     utter.pitch = 1.6;
     utter.volume = 1;
-    utter.onstart = () => { btn.textContent = '⏹ Arrêter'; };
-    utter.onend = utter.onerror = () => { btn.textContent = '🔊 Écouter'; };
+    utter.onstart = function() { btn.textContent = '⏹ Arrêter'; };
+    utter.onend = utter.onerror = function() { btn.textContent = '🔊 Écouter'; };
     speechSynthesis.speak(utter);
 };
 </script>
 """, unsafe_allow_html=True)
 
-# ═══════════════════════════════════════════════
-# FONCTIONS UTILITAIRES
-# ═══════════════════════════════════════════════
-
 def search_web_duckduckgo(query: str, max_results: int = 3) -> str:
-    """Recherche DuckDuckGo (API gratuite, sans clé)."""
     try:
         url = f"https://api.duckduckgo.com/?q={quote_plus(query)}&format=json&no_html=1&skip_disambig=1"
         resp = requests.get(url, timeout=8, headers={"User-Agent": "REIHANA-IA/2.0"})
@@ -251,18 +203,13 @@ def search_web_duckduckgo(query: str, max_results: int = 3) -> str:
     except Exception as e:
         return f"Erreur recherche web : {e}"
 
-
 def render_message_with_actions(content: str, msg_idx: int, is_deep: bool = False, web_info: str = ""):
-    """Affiche un message REIHANA + barre d'actions interactive."""
     badge = ""
     if is_deep:
         badge = '<div class="deep-think-badge">🧠 DEEP THINK MODE</div>'
     if web_info:
         badge += '<div class="web-search-badge">🌐 RECHERCHE WEB INCLUSE</div>'
-
-    # Échappement sécurisé pour l'attribut data-text
     safe_text = html.escape(content, quote=True)
-
     st.markdown(f"""
     <div class="msg-reihana">
         {badge}
@@ -270,20 +217,14 @@ def render_message_with_actions(content: str, msg_idx: int, is_deep: bool = Fals
     </div>
     <div class="action-bar">
         <button class="action-btn" onclick="reihanaLike(this)">❤️ J'aime</button>
-        <button class="action-btn" data-text="{safe_text}" onclick="reihanaCopyFrom(this)">📋 Copier</button>
-        <button class="action-btn" data-text="{safe_text}" onclick="reihanaSayFrom(this)">🔊 Écouter</button>
+        <button class="action-btn" data-text="{safe_text}" onclick="reihanaCopy(this)">📋 Copier</button>
+        <button class="action-btn" data-text="{safe_text}" onclick="reihanaSay(this)">🔊 Écouter</button>
     </div>
     """, unsafe_allow_html=True)
 
-    # Bouton Régénérer (côté Streamlit)
     if st.button("🔄 Régénérer", key=f"regen_{msg_idx}_{int(time.time()*100) % 10000}"):
         st.session_state.regen_idx = msg_idx
         st.rerun()
-
-
-# ═══════════════════════════════════════════════
-# ÉTAT DE SESSION (inchangé)
-# ═══════════════════════════════════════════════
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -311,7 +252,6 @@ if "regen_idx" not in st.session_state:
 if "msg_meta" not in st.session_state:
     st.session_state.msg_meta = {}
 
-# ── GÉRER RÉGÉNÉRATION ──
 if st.session_state.regen_idx is not None:
     idx = st.session_state.regen_idx
     st.session_state.regen_idx = None
@@ -333,13 +273,7 @@ if st.session_state.regen_idx is not None:
         st.session_state.messages[idx]["content"] = result["content"]
         st.rerun()
 
-# ═══════════════════════════════════════════════
-# SIDEBAR (inchangé mais l'appel reihanaSay dans l'avatar est enlevé car la fonction a changé de signature – on laisse un onclick vide ou on appelle la nouvelle)
-# ⚠️ On supprime l'appel vocal sur l'avatar pour éviter les erreurs
-# ═══════════════════════════════════════════════
-
 with st.sidebar:
-    # Avatar holographique sans onclick vocal
     st.markdown("""
     <div class="hologram-container">
         <div class="hologram-avatar">
@@ -362,26 +296,21 @@ with st.sidebar:
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.7rem;letter-spacing:2px;">EN LIGNE</span>', unsafe_allow_html=True)
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
-
     st.markdown('<div style="font-family:Orbitron,monospace;color:#00ccff;font-size:0.7rem;letter-spacing:2px;margin-bottom:8px;">👤 VOTRE PROFIL</div>', unsafe_allow_html=True)
     user_name = st.text_input("Votre nom :", value=st.session_state.user_id, key="user_name_input",
                                label_visibility="collapsed", placeholder="Entrez votre nom...")
     if user_name != st.session_state.user_id:
         st.session_state.user_id = user_name
-
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div style="font-family:Orbitron,monospace;color:#00ccff;font-size:0.7rem;letter-spacing:2px;margin-bottom:8px;">⚙️ MODES</div>', unsafe_allow_html=True)
-
     deep_think = st.checkbox("🧠 Deep Think (réflexion longue)", value=st.session_state.deep_think)
     st.session_state.deep_think = deep_think
     if deep_think:
         st.markdown('<div style="font-family:Rajdhani;color:rgba(170,136,255,0.7);font-size:0.75rem;">REIHANA réfléchira plus longuement avant de répondre.</div>', unsafe_allow_html=True)
-
     web_search_on = st.checkbox("🌐 Recherche web (DuckDuckGo)", value=st.session_state.web_search_on)
     st.session_state.web_search_on = web_search_on
     if web_search_on:
         st.markdown('<div style="font-family:Rajdhani;color:rgba(0,204,136,0.7);font-size:0.75rem;">REIHANA cherchera sur le web pour enrichir ses réponses.</div>', unsafe_allow_html=True)
-
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div style="font-family:Orbitron,monospace;color:#00ccff;font-size:0.7rem;letter-spacing:2px;margin-bottom:8px;">📎 FICHIERS</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
@@ -389,7 +318,6 @@ with st.sidebar:
         type=['txt', 'pdf', 'md', 'py', 'js', 'json', 'csv', 'zip'],
         label_visibility="collapsed"
     )
-
     if uploaded_file:
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp:
             tmp.write(uploaded_file.read())
@@ -401,16 +329,13 @@ with st.sidebar:
             st.session_state.mémoire.add_file(st.session_state.user_id, uploaded_file.name, result.get('content', '')[:200])
         st.markdown(f'<div class="stat-badge">✅ {uploaded_file.name}<br>Analysé et mémorisé</div>', unsafe_allow_html=True)
         os.unlink(tmp_path)
-
     if st.session_state.fichiers_contexte:
         st.markdown(f'<div class="stat-badge">📚 {len(st.session_state.fichiers_contexte)} fichier(s) en mémoire</div>', unsafe_allow_html=True)
         if st.button("🗑️ VIDER FICHIERS"):
             st.session_state.fichiers_contexte = []
             st.rerun()
-
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div style="font-family:Orbitron,monospace;color:#00ccff;font-size:0.7rem;letter-spacing:2px;margin-bottom:8px;">⚡ MOTEUR GROQ</div>', unsafe_allow_html=True)
-
     if hasattr(st.session_state, 'engine'):
         stats = st.session_state.engine.get_stats()
         st.markdown(f"""
@@ -419,14 +344,12 @@ with st.sidebar:
         <div class="stat-badge">TOKENS CLÉ 1 : {stats.get('tokens_cle1', 0):,}</div>
         <div class="stat-badge">TOKENS CLÉ 2 : {stats.get('tokens_cle2', 0):,}</div>
         """, unsafe_allow_html=True)
-
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     if st.button("🔄 NOUVELLE CONVERSATION"):
         st.session_state.messages = []
         st.session_state.fichiers_contexte = []
         st.session_state.msg_meta = {}
         st.rerun()
-
     st.markdown("""
     <div style="text-align:center;margin-top:20px;font-family:Rajdhani,sans-serif;color:rgba(0,200,255,0.3);font-size:0.75rem;">
         REIHANA v2.0<br>
@@ -434,11 +357,6 @@ with st.sidebar:
         Biny-Joe · 2025
     </div>
     """, unsafe_allow_html=True)
-
-
-# ═══════════════════════════════════════════════
-# ZONE PRINCIPALE - CHAT (inchangé)
-# ═══════════════════════════════════════════════
 
 col_title, col_status = st.columns([3, 1])
 with col_title:
@@ -558,11 +476,6 @@ if send_btn and user_input and user_input.strip():
         unsafe_allow_html=True
     )
     st.rerun()
-
-
-# ═══════════════════════════════════════════════
-# SUGGESTIONS RAPIDES
-# ═══════════════════════════════════════════════
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 st.markdown('<div style="font-family:Orbitron,monospace;color:rgba(0,200,255,0.5);font-size:0.65rem;letter-spacing:3px;margin-bottom:10px;">SUGGESTIONS RAPIDES</div>', unsafe_allow_html=True)
