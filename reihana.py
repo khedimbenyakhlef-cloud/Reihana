@@ -204,20 +204,23 @@ def search_web_duckduckgo(query: str, max_results: int = 3) -> str:
         return f"Erreur recherche web : {e}"
 
 def render_message_with_actions(content: str, msg_idx: int, is_deep: bool = False, web_info: str = ""):
-    ...
-safe_text = html.escape(content, quote=True)
-
-st.markdown(f"""
-<div class="msg-reihana">
-    {badge}
-    {content}
-</div>
-<div class="action-bar">
-    <button class="action-btn" onclick="reihanaLike(this)">❤️ J'aime</button>
-    <button class="action-btn" data-text="{safe_text}" onclick="reihanaCopy(this)">📋 Copier</button>
-    <button class="action-btn" data-text="{safe_text}" onclick="reihanaSay(this)">🔊 Écouter</button>
-</div>
-""", unsafe_allow_html=True)
+    badge = ""
+    if is_deep:
+        badge = '<div class="deep-think-badge">🧠 DEEP THINK MODE</div>'
+    if web_info:
+        badge += '<div class="web-search-badge">🌐 RECHERCHE WEB INCLUSE</div>'
+    safe_text = html.escape(content, quote=True)
+    st.markdown(f"""
+    <div class="msg-reihana">
+        {badge}
+        {content}
+    </div>
+    <div class="action-bar">
+        <button class="action-btn" onclick="reihanaLike(this)">❤️ J'aime</button>
+        <button class="action-btn" data-text="{safe_text}" onclick="reihanaCopy(this)">📋 Copier</button>
+        <button class="action-btn" data-text="{safe_text}" onclick="reihanaSay(this)">🔊 Écouter</button>
+    </div>
+    """, unsafe_allow_html=True)
 
     if st.button("🔄 Régénérer", key=f"regen_{msg_idx}_{int(time.time()*100) % 10000}"):
         st.session_state.regen_idx = msg_idx
@@ -290,7 +293,7 @@ with st.sidebar:
 
     st.markdown('<div class="reihana-title">REIHANA</div>', unsafe_allow_html=True)
     st.markdown('<div class="reihana-subtitle">IA · Fondée par Biny-Joe</div>', unsafe_allow_html=True)
-    st.markdown('<button onclick="alert(\'JavaScript OK\')">🧪 TEST JS</button>', unsafe_allow_html=True)
+    st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.7rem;letter-spacing:2px;">EN LIGNE</span>', unsafe_allow_html=True)
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div style="font-family:Orbitron,monospace;color:#00ccff;font-size:0.7rem;letter-spacing:2px;margin-bottom:8px;">👤 VOTRE PROFIL</div>', unsafe_allow_html=True)
