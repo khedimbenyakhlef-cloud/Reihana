@@ -196,6 +196,17 @@ section[data-testid="stSidebar"]{{background:linear-gradient(180deg,#020218,#030
 st.markdown(f"""<script>
 window.reiConfig={{rate:{PERS['rate']},pitch:{PERS['pitch']},lang:'{T["slang"]}'}};
 
+document.addEventListener('keydown',function(e){
+    if(e.key==='Enter'&&!e.shiftKey){
+        var ta=document.querySelector('textarea');
+        if(ta&&document.activeElement===ta){
+            e.preventDefault();
+            var btns=Array.from(document.querySelectorAll('button'));
+            var send=btns.find(b=>b.innerText.includes('ENVOYER')||b.innerText.includes('SEND')||b.innerText.includes('إرسال'));
+            if(send)send.click();
+        }
+    }
+});
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
@@ -568,7 +579,7 @@ if st.session_state.regen_index is not None:
 # ═══════════════════════════════════════════
 if send_btn and user_input and user_input.strip():
     question=user_input.strip()
-    st.session_state.clear_input=True; st.session_state.input_value=""
+    st.session_state.clear_input=True; st.session_state.input_value=""; st.rerun()
     st.session_state.messages.append({"role":"user","content":question})
 
     rep,res,web_res=process_msg(question)
