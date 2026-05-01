@@ -528,7 +528,7 @@ for i,msg in enumerate(st.session_state.messages):
                     clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
                     components.html(f"""<script>
                     var u = new SpeechSynthesisUtterance('{clean}');
-                    u.lang = 'fr-FR'; u.rate = 1.1; u.pitch = 1.5;
+                    u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5; var vx=window.speechSynthesis.getVoices(); var fv=vx.filter(v=>v.lang.startsWith(u.lang.split('-')[0])); if(fv[0])u.voice=fv[0];
                     window.speechSynthesis.cancel();
                     window.speechSynthesis.speak(u);
                     </script>""", height=0)
@@ -545,7 +545,7 @@ st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 ci, cs2 = st.columns([5,1])
 with ci:
     if st.session_state.clear_input:
-        st.session_state.input_value=""; st.session_state.clear_input=False
+        st.session_state.input_value=""; st.session_state.clear_input=False; st.rerun()
     user_input=st.text_area("",value=st.session_state.input_value,placeholder=T["placeholder"],key="uinput",height=80,label_visibility="collapsed")
     st.session_state.input_value=user_input
 with cs2:
