@@ -196,17 +196,20 @@ section[data-testid="stSidebar"]{{background:linear-gradient(180deg,#020218,#030
 st.markdown(f"""<script>
 window.reiConfig={{rate:{PERS['rate']},pitch:{PERS['pitch']},lang:'{T["slang"]}'}};
 
-document.addEventListener('keydown',function(e){
-    if(e.key==='Enter'&&!e.shiftKey){
-        var ta=document.querySelector('textarea');
-        if(ta&&document.activeElement===ta){
-            e.preventDefault();
-            var btns=Array.from(document.querySelectorAll('button'));
-            var send=btns.find(b=>b.innerText.includes('ENVOYER')||b.innerText.includes('SEND')||b.innerText.includes('إرسال'));
-            if(send)send.click();
-        }
-    }
-});
+window.reiEnterSend=function(){{
+    document.addEventListener('keydown',function(e){{
+        if(e.key==='Enter'&&!e.shiftKey){{
+            var ta=document.querySelector('textarea');
+            if(ta&&document.activeElement===ta){{
+                e.preventDefault();
+                var btns=Array.from(document.querySelectorAll('button'));
+                var send=btns.find(function(b){{return b.innerText.includes('ENVOYER')||b.innerText.includes('SEND');}});
+                if(send)send.click();
+            }}
+        }}
+    }});
+}};
+setTimeout(window.reiEnterSend,1000);
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
