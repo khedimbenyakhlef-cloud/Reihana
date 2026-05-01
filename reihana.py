@@ -473,6 +473,7 @@ with st.sidebar:
             save_conv(); st.toast(T["saved"])
     with hc2:
         if st.button(T["new_conv"][:12]+"...", use_container_width=True):
+    st.session_state.messages=[]
     import streamlit.components.v1 as components
     components.html("""<button onclick="toggleMusic()" style="width:100%;background:linear-gradient(135deg,#001440,#002060);border:1px solid rgba(0,200,255,0.4);color:#00ccff;font-family:monospace;font-size:0.65rem;letter-spacing:2px;border-radius:8px;padding:10px;cursor:pointer;margin:4px 0;">&#127925; MUSIQUE ON/OFF</button><audio id="bgMusic" loop><source src="https://cdn.pixabay.com/audio/2022/03/15/audio_c8f0f5e6e0.mp3" type="audio/mpeg"></audio><script>var playing=false;function toggleMusic(){var a=document.getElementById('bgMusic');if(playing){a.pause();playing=false;}else{a.play().then(function(){playing=true;}).catch(function(){});}}</script>""", height=55)
             save_conv()
