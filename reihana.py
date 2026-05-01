@@ -523,6 +523,14 @@ for i,msg in enumerate(st.session_state.messages):
                 st.toast(T["copied"])
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
+                    import streamlit.components.v1 as components
+                    clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
+                    components.html(f"""<script>
+                    var u = new SpeechSynthesisUtterance('{clean}');
+                    u.lang = 'fr-FR'; u.rate = 1.1; u.pitch = 1.5;
+                    window.speechSynthesis.cancel();
+                    window.speechSynthesis.speak(u);
+                    </script>""", height=0)
                 st.markdown(f"<script>window.reihanaSpeak('{safe_js(content)}');</script>", unsafe_allow_html=True)
         with cd:
             if st.button("🔄 Regen", key=f"rg{i}", use_container_width=True):
