@@ -5,6 +5,7 @@ Fondée par Khedim Benyakhlef (Biny-Joe)
 import streamlit as st
 import sys, os, json, time, tempfile, urllib.request, urllib.parse
 from pathlib import Path
+from avatar_reihana import render_avatar_sidebar, get_avatar_js
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
