@@ -204,7 +204,7 @@ window.reihanaSpeak=function(text){{
         let u=new SpeechSynthesisUtterance(clean);
         u.lang=window.reiConfig.lang; u.rate=window.reiConfig.rate; u.pitch=window.reiConfig.pitch; u.volume=1;
         let fv=voices.filter(v=>v.lang.startsWith(window.reiConfig.lang.split('-')[0]));
-        let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/))||fv[0];
+        let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina|arabic|arab/))||fv[0]; if(!fem&&fv.length==0){let arv=window.speechSynthesis.getVoices().find(v=>v.lang.startsWith('ar')); if(arv)u.voice=arv;}
         if(fem)u.voice=fem;
         u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');}};
         u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');}};
