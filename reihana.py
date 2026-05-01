@@ -531,7 +531,6 @@ for i,msg in enumerate(st.session_state.messages):
                     window.speechSynthesis.cancel();
                     window.speechSynthesis.speak(u);
                     </script>""", height=0)
-                st.markdown(f"<script>window.reihanaSpeak('{safe_js(content)}');</script>", unsafe_allow_html=True)
         with cd:
             if st.button("🔄 Regen", key=f"rg{i}", use_container_width=True):
                 if i>0 and st.session_state.messages[i-1]["role"]=="user":
