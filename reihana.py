@@ -582,9 +582,7 @@ if st.session_state.regen_index is not None:
 # ═══════════════════════════════════════════
 if send_btn and user_input and user_input.strip():
     question=user_input.strip()
-    st.session_state.clear_input=True; st.session_state.input_value=""; st.rerun()
     st.session_state.messages.append({"role":"user","content":question})
-
     rep,res,web_res=process_msg(question)
 
     if web_res:
