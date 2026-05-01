@@ -3,3 +3,5 @@ groq>=0.4.0
 pypdf>=3.17.0
 requests>=2.31.0
 pathlib
+websockets
+websockets
