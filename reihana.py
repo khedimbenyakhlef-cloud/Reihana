@@ -283,7 +283,18 @@ def safe_js(text):
 # ═══════════════════════════════════════════
 with st.sidebar:
     # ✅ AVATAR ANIMÉ SVG (remplace l'ancien hologramme emoji)
-    render_avatar_sidebar(p, g, br)
+    st.markdown(f"""
+    <div class="hologram-container">
+        <div class="hologram-avatar" onclick="window.reihanaStop()">
+            {PERS["emoji"]}
+            <div class="holo-mouth"></div>
+        </div>
+        <div class="voice-bars">
+            <div class="voice-bar"></div><div class="voice-bar"></div><div class="voice-bar"></div>
+            <div class="voice-bar"></div><div class="voice-bar"></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown(get_avatar_js(), unsafe_allow_html=True)
 
     st.markdown(f"""
