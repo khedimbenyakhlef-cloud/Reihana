@@ -194,7 +194,6 @@ section[data-testid="stSidebar"]{{background:linear-gradient(180deg,#020218,#030
 # JAVASCRIPT
 # ═══════════════════════════════════════════
 st.markdown(f"""<script>
-document.addEventListener(chr(39)+chr(99)+chr(108)+chr(105)+chr(99)+chr(107)+chr(39),function(){var a=document.querySelector(chr(39)+chr(97)+chr(117)+chr(100)+chr(105)+chr(111)+chr(39));if(a)a.play().catch(function(){});},{once:true});
 window.reiConfig={{rate:{PERS['rate']},pitch:{PERS['pitch']},lang:'{T["slang"]}'}};
 
 window.reihanaSpeak=function(text){{
