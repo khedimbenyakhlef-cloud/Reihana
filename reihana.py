@@ -25,7 +25,7 @@ st.markdown("""
   opacity:0.72;
   filter:drop-shadow(0 0 40px rgba(0,255,255,0.35));
 ">
-<svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" width="520" height="520">
+<svg id="reiBgAvatar" viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" width="520" height="520">
   <defs>
     <radialGradient id="skinBG" cx="45%" cy="35%" r="65%">
       <stop offset="0%" stop-color="#ffe8d5"/>
@@ -67,6 +67,14 @@ st.markdown("""
       <stop offset="100%" stop-color="#050020"/>
     </linearGradient>
   </defs>
+  <style>
+    #reiBgAvatar { animation: bgFloat 6s ease-in-out infinite; transform-origin: center; }
+    @keyframes bgFloat {
+      0%,100% { transform: translateY(0px) rotate(0deg); }
+      25% { transform: translateY(-12px) rotate(0.5deg); }
+      75% { transform: translateY(8px) rotate(-0.5deg); }
+    }
+  </style>
 
   <!-- CORPS / ÉPAULES -->
   <ellipse cx="200" cy="480" rx="130" ry="90" fill="url(#bodyBG)"/>
@@ -99,6 +107,9 @@ st.markdown("""
   <!-- Mèche centrale -->
   <path d="M185,75 C182,100 180,130 190,150 C195,140 200,120 200,100 C205,120 205,140 210,150 C220,130 218,100 215,75 C210,70 205,68 200,68 C195,68 190,70 185,75 Z" fill="url(#hairBG)"/>
 
+  <!-- PAUPIÈRES ANIMÉES -->
+  <path id="bgEyelidL" d="M136,194 C144,186 155,183 175,188 C183,192 188,198 188,205" stroke="#110030" stroke-width="18" fill="none" stroke-linecap="round" opacity="0"/>
+  <path id="bgEyelidR" d="M264,194 C256,186 245,183 225,188 C217,192 212,198 212,205" stroke="#110030" stroke-width="18" fill="none" stroke-linecap="round" opacity="0"/>
   <!-- SOURCILS -->
   <path d="M140,170 C150,164 165,162 178,165" stroke="#220040" stroke-width="4" fill="none" stroke-linecap="round"/>
   <path d="M222,165 C235,162 250,164 260,170" stroke="#220040" stroke-width="4" fill="none" stroke-linecap="round"/>
@@ -141,7 +152,7 @@ st.markdown("""
   <ellipse cx="262" cy="255" rx="32" ry="20" fill="url(#chkBG)"/>
 
   <!-- BOUCHE -->
-  <path d="M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295" stroke="#cc6680" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- lip orig replaced by animated above -->
   <path d="M170,295 C180,308 192,314 200,314 C208,314 220,308 230,295" fill="url(#lipBG)" opacity="0.9"/>
   <path d="M170,295 C180,308 192,314 200,314 C208,314 220,308 230,295" stroke="#cc4466" stroke-width="1.5" fill="none"/>
   <!-- Lèvre sup -->
@@ -166,6 +177,9 @@ st.markdown("""
   <circle cx="309" cy="248" r="8" fill="url(#sakBG)" opacity="0.9"/>
   <circle cx="309" cy="265" r="5" fill="url(#sakBG)" opacity="0.7"/>
 
+  <!-- BOUCHE ANIMÉE IDs -->
+  <path id="bgLipT" d="M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295" stroke="#cc6680" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <ellipse id="bgMouthOpen" cx="200" cy="305" rx="0" ry="0" fill="#330010" opacity="0.9"/>
   <!-- REFLET LUMINEUX VISAGE -->
   <ellipse cx="170" cy="160" rx="35" ry="20" fill="rgba(255,255,255,0.06)" transform="rotate(-20,170,160)"/>
 
@@ -548,24 +562,41 @@ with st.sidebar:
 (function(){
   function ge(id){return document.getElementById(id);}
   var _spk=false;
+
+  // === CLIGNEMENT AVATAR SIDEBAR ===
   function blink(){
     var eL=ge("eyelidL"),eR=ge("eyelidR"),pL=ge("pupilL"),pR=ge("pupilR");
-    if(!eL||!eR)return;
-    eL.setAttribute("opacity","1");eR.setAttribute("opacity","1");
-    eL.setAttribute("d","M50,80 C53,80 58,80 62,80 C66,80 71,80 74,80");
-    eR.setAttribute("d","M80,80 C83,80 88,80 92,80 C96,80 101,80 104,80");
-    if(pL)pL.setAttribute("ry","1");if(pR)pR.setAttribute("ry","1");
-    setTimeout(function(){
-      eL.setAttribute("opacity","0");eR.setAttribute("opacity","0");
-      eL.setAttribute("d","M50,74 C53,74 58,74 62,74 C66,74 71,74 74,74");
-      eR.setAttribute("d","M80,74 C83,74 88,74 92,74 C96,74 101,74 104,74");
-      if(pL)pL.setAttribute("ry","4.5");if(pR)pR.setAttribute("ry","4.5");
-    },130);
+    // === CLIGNEMENT AVATAR BACKGROUND ===
+    var bgEL=ge("bgEyelidL"),bgER=ge("bgEyelidR"),bgPL=ge("bgPupilL"),bgPR=ge("bgPupilR");
+    // Sidebar blink
+    if(eL&&eR){
+      eL.setAttribute("opacity","1");eR.setAttribute("opacity","1");
+      eL.setAttribute("d","M50,80 C53,80 58,80 62,80 C66,80 71,80 74,80");
+      eR.setAttribute("d","M80,80 C83,80 88,80 92,80 C96,80 101,80 104,80");
+      if(pL)pL.setAttribute("ry","1");if(pR)pR.setAttribute("ry","1");
+      setTimeout(function(){
+        eL.setAttribute("opacity","0");eR.setAttribute("opacity","0");
+        eL.setAttribute("d","M50,74 C53,74 58,74 62,74 C66,74 71,74 74,74");
+        eR.setAttribute("d","M80,74 C83,74 88,74 92,74 C96,74 101,74 104,74");
+        if(pL)pL.setAttribute("ry","4.5");if(pR)pR.setAttribute("ry","4.5");
+      },130);
+    }
+    // Background avatar blink
+    if(bgEL&&bgER){
+      bgEL.setAttribute("opacity","1");bgER.setAttribute("opacity","1");
+      if(bgPL)bgPL.setAttribute("ry","1");if(bgPR)bgPR.setAttribute("ry","1");
+      setTimeout(function(){
+        bgEL.setAttribute("opacity","0");bgER.setAttribute("opacity","0");
+        if(bgPL)bgPL.setAttribute("ry","5.5");if(bgPR)bgPR.setAttribute("ry","5.5");
+      },130);
+    }
   }
   function sb(){setTimeout(function(){blink();sb();},2500+Math.random()*3000);}
   var _mt=null;
   function mouth(lv){
     var lT=ge("lipT"),lB=ge("lipB"),mi=ge("mouthIn"),mt=ge("mouthTth");
+    // BG avatar mouth
+    var bgLT=ge("bgLipT"),bgMO=ge("bgMouthOpen");
     if(!lT||!lB)return;
     var oh=lv*7;
     if(lv<0.05){
@@ -573,12 +604,20 @@ with st.sidebar:
       lB.setAttribute("d","M67,106 C70,109 74,110 77,110 C80,110 84,109 87,106");
       if(mi){mi.setAttribute("rx","0");mi.setAttribute("ry","0");}
       if(mt)mt.setAttribute("opacity","0");
+      // BG mouth closed
+      if(bgLT)bgLT.setAttribute("d","M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295");
+      if(bgMO){bgMO.setAttribute("rx","0");bgMO.setAttribute("ry","0");}
     }else{
       var ty=106-oh*0.3,by=106+oh;
       lT.setAttribute("d","M67,"+ty+" C70,"+(ty-3)+" 74,"+(ty-4)+" 77,"+(ty-4)+" C80,"+(ty-4)+" 84,"+(ty-3)+" 87,"+ty);
       lB.setAttribute("d","M67,"+ty+" C70,"+by+" 74,"+(by+1)+" 77,"+(by+1)+" C80,"+(by+1)+" 84,"+by+" 87,"+ty);
       if(mi){mi.setAttribute("cx","77");mi.setAttribute("cy",String((ty+by)/2));mi.setAttribute("rx",String(8*lv));mi.setAttribute("ry",String(oh*0.55));mi.setAttribute("opacity","0.85");}
       if(mt){mt.setAttribute("opacity",String(lv*0.8));mt.setAttribute("y",String(ty));}
+      // BG mouth open - scaled up
+      var bgOh=lv*18;
+      var bgTy=295-bgOh*0.3,bgBy=295+bgOh;
+      if(bgLT)bgLT.setAttribute("d","M170,"+bgTy+" C180,"+(bgTy-5)+" 192,"+(bgTy-8)+" 200,"+(bgTy-8)+" C208,"+(bgTy-8)+" 220,"+(bgTy-5)+" 230,"+bgTy);
+      if(bgMO){bgMO.setAttribute("cx","200");bgMO.setAttribute("cy",String((bgTy+bgBy)/2));bgMO.setAttribute("rx",String(22*lv));bgMO.setAttribute("ry",String(bgOh*0.55));bgMO.setAttribute("opacity","0.9");}
     }
   }
   function sm(){
@@ -605,7 +644,29 @@ with st.sidebar:
     var ns=window.speechSynthesis.speak.bind(window.speechSynthesis);
     window.speechSynthesis.speak=function(u){u.addEventListener("start",startS);u.addEventListener("end",stopS);u.addEventListener("error",stopS);ns(u);};
   }
-  function init(){sb();sm();setTimeout(blink,800);}
+  // === MOUVEMENT YEUX BG (regard naturel) ===
+  function moveBgEyes(){
+    var bgPL=ge("bgPupilL"),bgPR=ge("bgPupilR");
+    if(!bgPL||!bgPR)return;
+    var dx=(Math.random()-0.5)*12;
+    var dy=(Math.random()-0.5)*6;
+    bgPL.setAttribute("cx",String(163+dx));bgPL.setAttribute("cy",String(205+dy));
+    bgPR.setAttribute("cx",String(237+dx));bgPR.setAttribute("cy",String(205+dy));
+  }
+  // Expressions faciales BG (sourcils, etc.)
+  function bgExpression(){
+    // Légère rotation de tête simulée via transform
+    var svg=ge("reiBgAvatar");
+    if(!svg)return;
+    var tilt=(Math.random()-0.5)*4;
+    var ty=(Math.random()-0.5)*8;
+    svg.style.transform="translateY("+ty+"px) rotate("+tilt+"deg)";
+    svg.style.transition="transform 1.5s ease-in-out";
+  }
+  setInterval(moveBgEyes, 2800);
+  setInterval(bgExpression, 3500);
+
+  function init(){sb();sm();setTimeout(blink,800);setTimeout(moveBgEyes,500);}
   if(document.readyState==="complete"){init();}else{window.addEventListener("load",init);setTimeout(init,1200);}
 })();
 </script>""", unsafe_allow_html=True)
