@@ -109,14 +109,17 @@ st.markdown("""
       80% { transform: translate(-5px,-1px); }
     }
     #bgLipT {
-      animation: bgTalk 0.3s ease-in-out infinite paused;
+      animation: bgTalk 0.25s ease-in-out infinite paused;
+      transform-origin: 200px 295px;
     }
     #reiBgAvatar.talking #bgLipT {
       animation-play-state: running;
     }
     @keyframes bgTalk {
-      0%,100% { d: path("M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295"); }
-      50% { d: path("M170,291 C180,282 192,278 200,278 C208,278 220,282 230,291"); }
+      0%,100% { transform: scaleY(1); }
+      25%     { transform: scaleY(0.2) translateY(-4px); }
+      50%     { transform: scaleY(2.0) translateY(3px); }
+      75%     { transform: scaleY(0.4) translateY(-2px); }
     }
   </style>
 
@@ -223,7 +226,10 @@ st.markdown("""
 
   <!-- BOUCHE ANIMÉE IDs -->
   <path id="bgLipT" d="M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295" stroke="#cc6680" stroke-width="3" fill="none" stroke-linecap="round"/>
-  <ellipse id="bgMouthOpen" cx="200" cy="305" rx="0" ry="0" fill="#330010" opacity="0.9"/>
+  <ellipse id="bgMouthOpen" cx="200" cy="305" rx="0" ry="0" fill="#330010" opacity="0.9">
+    <animate attributeName="rx" values="0;18;8;20;5;0" dur="0.3s" repeatCount="indefinite" begin="indefinite" id="mouthOpenAnim"/>
+    <animate attributeName="ry" values="0;8;4;10;2;0" dur="0.3s" repeatCount="indefinite" begin="indefinite"/>
+  </ellipse>
   <!-- REFLET LUMINEUX VISAGE -->
   <ellipse cx="170" cy="160" rx="35" ry="20" fill="rgba(255,255,255,0.06)" transform="rotate(-20,170,160)"/>
 
@@ -389,15 +395,15 @@ setTimeout(window.reiEnterSend,1000);
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
-    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,900);
+    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,3000);
     function doSpeak(voices){{
         let u=new SpeechSynthesisUtterance(clean);
         u.lang=window.reiConfig.lang; u.rate=window.reiConfig.rate; u.pitch=window.reiConfig.pitch; u.volume=1;
         let fv=voices.filter(v=>v.lang.startsWith(window.reiConfig.lang.split('-')[0]));
         let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/))||fv[0];
         if(fem)u.voice=fem;
-        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');}};
-        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');}};
+        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');document.getElementById('reiBgAvatar')?.classList.add('talking');try{{document.getElementById('mouthOpenAnim')?.beginElement();}}catch(e){{}}}};
+        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');document.getElementById('reiBgAvatar')?.classList.remove('talking');}};
         window.speechSynthesis.speak(u);
     }}
     let vv=window.speechSynthesis.getVoices();
@@ -836,7 +842,7 @@ for i,msg in enumerate(st.session_state.messages):
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
                 import streamlit.components.v1 as components
-                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
+                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:3000]
                 components.html(f"""<script>
                 var u = new SpeechSynthesisUtterance('{clean}');
                 u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5;
