@@ -68,11 +68,55 @@ st.markdown("""
     </linearGradient>
   </defs>
   <style>
-    #reiBgAvatar { animation: bgFloat 6s ease-in-out infinite; transform-origin: center; }
+    #reiBgAvatar {
+      animation: bgFloat 6s ease-in-out infinite;
+      transform-origin: 200px 260px;
+    }
     @keyframes bgFloat {
       0%,100% { transform: translateY(0px) rotate(0deg); }
-      25% { transform: translateY(-12px) rotate(0.5deg); }
-      75% { transform: translateY(8px) rotate(-0.5deg); }
+      25% { transform: translateY(-14px) rotate(1deg); }
+      50% { transform: translateY(-5px) rotate(0deg); }
+      75% { transform: translateY(10px) rotate(-1deg); }
+    }
+    #bgEyelidL, #bgEyelidR {
+      animation: bgBlink 4s ease-in-out infinite;
+    }
+    #bgEyelidR { animation-delay: 0.05s; }
+    @keyframes bgBlink {
+      0%,90%,100% { opacity: 0; }
+      92%,98% { opacity: 1; }
+    }
+    #bgPupilL {
+      animation: bgLookL 7s ease-in-out infinite;
+      transform-origin: 163px 205px;
+    }
+    #bgPupilR {
+      animation: bgLookR 7s ease-in-out infinite;
+      transform-origin: 237px 205px;
+    }
+    @keyframes bgLookL {
+      0%,100% { transform: translate(0,0); }
+      20% { transform: translate(5px,-2px); }
+      40% { transform: translate(-4px,3px); }
+      60% { transform: translate(3px,4px); }
+      80% { transform: translate(-5px,-1px); }
+    }
+    @keyframes bgLookR {
+      0%,100% { transform: translate(0,0); }
+      20% { transform: translate(5px,-2px); }
+      40% { transform: translate(-4px,3px); }
+      60% { transform: translate(3px,4px); }
+      80% { transform: translate(-5px,-1px); }
+    }
+    #bgLipT {
+      animation: bgTalk 0.3s ease-in-out infinite paused;
+    }
+    #reiBgAvatar.talking #bgLipT {
+      animation-play-state: running;
+    }
+    @keyframes bgTalk {
+      0%,100% { d: path("M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295"); }
+      50% { d: path("M170,291 C180,282 192,278 200,278 C208,278 220,282 230,291"); }
     }
   </style>
 
@@ -558,17 +602,23 @@ with st.sidebar:
     <div class="reihana-subtitle">IA · Biny-Joe · {PERS["emoji"]} {st.session_state.personnalite[:14]}</div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""<script>
+    import streamlit.components.v1 as comp_av
+    comp_av.html("""<script>
 (function(){
-  function ge(id){return document.getElementById(id);}
+  // Attendre que les SVGs soient dans le DOM parent via postMessage ou polling
+  function ge(id){
+    // Chercher dans le document parent (Streamlit iframe)
+    try{
+      var el = window.parent.document.getElementById(id);
+      if(el) return el;
+    }catch(e){}
+    return document.getElementById(id);
+  }
   var _spk=false;
 
-  // === CLIGNEMENT AVATAR SIDEBAR ===
   function blink(){
     var eL=ge("eyelidL"),eR=ge("eyelidR"),pL=ge("pupilL"),pR=ge("pupilR");
-    // === CLIGNEMENT AVATAR BACKGROUND ===
     var bgEL=ge("bgEyelidL"),bgER=ge("bgEyelidR"),bgPL=ge("bgPupilL"),bgPR=ge("bgPupilR");
-    // Sidebar blink
     if(eL&&eR){
       eL.setAttribute("opacity","1");eR.setAttribute("opacity","1");
       eL.setAttribute("d","M50,80 C53,80 58,80 62,80 C66,80 71,80 74,80");
@@ -581,7 +631,6 @@ with st.sidebar:
         if(pL)pL.setAttribute("ry","4.5");if(pR)pR.setAttribute("ry","4.5");
       },130);
     }
-    // Background avatar blink
     if(bgEL&&bgER){
       bgEL.setAttribute("opacity","1");bgER.setAttribute("opacity","1");
       if(bgPL)bgPL.setAttribute("ry","1");if(bgPR)bgPR.setAttribute("ry","1");
@@ -592,10 +641,10 @@ with st.sidebar:
     }
   }
   function sb(){setTimeout(function(){blink();sb();},2500+Math.random()*3000);}
+
   var _mt=null;
   function mouth(lv){
     var lT=ge("lipT"),lB=ge("lipB"),mi=ge("mouthIn"),mt=ge("mouthTth");
-    // BG avatar mouth
     var bgLT=ge("bgLipT"),bgMO=ge("bgMouthOpen");
     if(!lT||!lB)return;
     var oh=lv*7;
@@ -604,7 +653,6 @@ with st.sidebar:
       lB.setAttribute("d","M67,106 C70,109 74,110 77,110 C80,110 84,109 87,106");
       if(mi){mi.setAttribute("rx","0");mi.setAttribute("ry","0");}
       if(mt)mt.setAttribute("opacity","0");
-      // BG mouth closed
       if(bgLT)bgLT.setAttribute("d","M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295");
       if(bgMO){bgMO.setAttribute("rx","0");bgMO.setAttribute("ry","0");}
     }else{
@@ -613,16 +661,13 @@ with st.sidebar:
       lB.setAttribute("d","M67,"+ty+" C70,"+by+" 74,"+(by+1)+" 77,"+(by+1)+" C80,"+(by+1)+" 84,"+by+" 87,"+ty);
       if(mi){mi.setAttribute("cx","77");mi.setAttribute("cy",String((ty+by)/2));mi.setAttribute("rx",String(8*lv));mi.setAttribute("ry",String(oh*0.55));mi.setAttribute("opacity","0.85");}
       if(mt){mt.setAttribute("opacity",String(lv*0.8));mt.setAttribute("y",String(ty));}
-      // BG mouth open - scaled up
-      var bgOh=lv*18;
-      var bgTy=295-bgOh*0.3,bgBy=295+bgOh;
+      var bgOh=lv*18;var bgTy=295-bgOh*0.3,bgBy=295+bgOh;
       if(bgLT)bgLT.setAttribute("d","M170,"+bgTy+" C180,"+(bgTy-5)+" 192,"+(bgTy-8)+" 200,"+(bgTy-8)+" C208,"+(bgTy-8)+" 220,"+(bgTy-5)+" 230,"+bgTy);
       if(bgMO){bgMO.setAttribute("cx","200");bgMO.setAttribute("cy",String((bgTy+bgBy)/2));bgMO.setAttribute("rx",String(22*lv));bgMO.setAttribute("ry",String(bgOh*0.55));bgMO.setAttribute("opacity","0.9");}
     }
   }
   function sm(){
-    if(_mt)clearInterval(_mt);
-    var ph=0;
+    if(_mt)clearInterval(_mt);var ph=0;
     _mt=setInterval(function(){
       if(!_spk){mouth(0);return;}
       ph+=0.4;mouth(Math.min(Math.abs(Math.sin(ph))*0.7+Math.random()*0.3,1));
@@ -635,41 +680,41 @@ with st.sidebar:
     gL.setAttribute("rx",v);gL.setAttribute("ry",v);gL.setAttribute("opacity",o);
     gR.setAttribute("rx",v);gR.setAttribute("ry",v);gR.setAttribute("opacity",o);
   }
-  function startS(){_spk=true;var b=document.querySelector('.hologram-avatar'),bars=document.querySelector('.voice-bars');if(b)b.classList.add("speaking");if(bars)bars.classList.add("active");glow(true);}
-  function stopS(){_spk=false;var b=document.querySelector('.hologram-avatar'),bars=document.querySelector('.voice-bars');if(b)b.classList.remove("speaking");if(bars)bars.classList.remove("active");glow(false);mouth(0);}
-  var _oS=window.reihanaSpeak,_oSt=window.reihanaStop;
-  window.reihanaSpeak=function(t){startS();if(_oS)_oS(t);setTimeout(function(){if(_spk)stopS();},Math.max(1500,t.length*55)+500);};
-  window.reihanaStop=function(){stopS();if(_oSt)_oSt();};
-  if(window.speechSynthesis){
-    var ns=window.speechSynthesis.speak.bind(window.speechSynthesis);
-    window.speechSynthesis.speak=function(u){u.addEventListener("start",startS);u.addEventListener("end",stopS);u.addEventListener("error",stopS);ns(u);};
-  }
-  // === MOUVEMENT YEUX BG (regard naturel) ===
+  function startS(){_spk=true;var b=ge("hologramAvatar")||window.parent.document.querySelector('.hologram-avatar');var bars=window.parent.document.querySelector('.voice-bars');if(b)b.classList.add("speaking");if(bars)bars.classList.add("active");glow(true);}
+  function stopS(){_spk=false;var b=window.parent.document.querySelector('.hologram-avatar');var bars=window.parent.document.querySelector('.voice-bars');if(b)b.classList.remove("speaking");if(bars)bars.classList.remove("active");glow(false);mouth(0);}
+
+  // Intercepter reihanaSpeak du parent
+  try{
+    var _oS=window.parent.reihanaSpeak,_oSt=window.parent.reihanaStop;
+    window.parent.reihanaSpeak=function(t){startS();if(_oS)_oS(t);setTimeout(function(){if(_spk)stopS();},Math.max(1500,t.length*55)+500);};
+    window.parent.reihanaStop=function(){stopS();if(_oSt)_oSt();};
+    if(window.parent.speechSynthesis){
+      var ns=window.parent.speechSynthesis.speak.bind(window.parent.speechSynthesis);
+      window.parent.speechSynthesis.speak=function(u){u.addEventListener("start",startS);u.addEventListener("end",stopS);u.addEventListener("error",stopS);ns(u);};
+    }
+  }catch(e){}
+
   function moveBgEyes(){
     var bgPL=ge("bgPupilL"),bgPR=ge("bgPupilR");
     if(!bgPL||!bgPR)return;
-    var dx=(Math.random()-0.5)*12;
-    var dy=(Math.random()-0.5)*6;
+    var dx=(Math.random()-0.5)*12,dy=(Math.random()-0.5)*6;
     bgPL.setAttribute("cx",String(163+dx));bgPL.setAttribute("cy",String(205+dy));
     bgPR.setAttribute("cx",String(237+dx));bgPR.setAttribute("cy",String(205+dy));
   }
-  // Expressions faciales BG (sourcils, etc.)
   function bgExpression(){
-    // Légère rotation de tête simulée via transform
     var svg=ge("reiBgAvatar");
     if(!svg)return;
-    var tilt=(Math.random()-0.5)*4;
-    var ty=(Math.random()-0.5)*8;
+    var tilt=(Math.random()-0.5)*4,ty=(Math.random()-0.5)*8;
     svg.style.transform="translateY("+ty+"px) rotate("+tilt+"deg)";
     svg.style.transition="transform 1.5s ease-in-out";
   }
-  setInterval(moveBgEyes, 2800);
-  setInterval(bgExpression, 3500);
+  setInterval(moveBgEyes,2800);
+  setInterval(bgExpression,3500);
 
   function init(){sb();sm();setTimeout(blink,800);setTimeout(moveBgEyes,500);}
   if(document.readyState==="complete"){init();}else{window.addEventListener("load",init);setTimeout(init,1200);}
 })();
-</script>""", unsafe_allow_html=True)
+</script>""", height=0)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
