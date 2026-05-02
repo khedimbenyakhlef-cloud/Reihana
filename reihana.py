@@ -109,14 +109,25 @@ st.markdown("""
       80% { transform: translate(-5px,-1px); }
     }
     #bgLipT {
-      animation: bgTalk 0.3s ease-in-out infinite paused;
+      animation: bgTalk 0.22s ease-in-out infinite paused;
+      transform-origin: 200px 292px;
     }
-    #reiBgAvatar.talking #bgLipT {
+    #bgMouthOpen {
+      animation: bgMouthAnim 0.22s ease-in-out infinite paused;
+    }
+    #reiBgAvatar.talking #bgLipT,
+    #reiBgAvatar.talking #bgMouthOpen {
       animation-play-state: running;
     }
     @keyframes bgTalk {
-      0%,100% { d: path("M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295"); }
-      50% { d: path("M170,291 C180,282 192,278 200,278 C208,278 220,282 230,291"); }
+      0%,100% { transform: scaleY(1); }
+      30%     { transform: scaleY(0.15) translateY(-3px); }
+      60%     { transform: scaleY(1.9) translateY(4px); }
+    }
+    @keyframes bgMouthAnim {
+      0%,100% { rx: 0; ry: 0; }
+      30%     { rx: 16; ry: 5; }
+      60%     { rx: 22; ry: 9; }
     }
   </style>
 
@@ -389,15 +400,15 @@ setTimeout(window.reiEnterSend,1000);
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
-    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,900);
+    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,3000);
     function doSpeak(voices){{
         let u=new SpeechSynthesisUtterance(clean);
         u.lang=window.reiConfig.lang; u.rate=window.reiConfig.rate; u.pitch=window.reiConfig.pitch; u.volume=1;
         let fv=voices.filter(v=>v.lang.startsWith(window.reiConfig.lang.split('-')[0]));
         let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/))||fv[0];
         if(fem)u.voice=fem;
-        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');}};
-        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');}};
+        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');document.getElementById('reiBgAvatar')?.classList.add('talking');}};
+        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');document.getElementById('reiBgAvatar')?.classList.remove('talking');}};
         window.speechSynthesis.speak(u);
     }}
     let vv=window.speechSynthesis.getVoices();
@@ -410,169 +421,125 @@ window.reihanaStop=function(){{
     document.querySelector('.holo-mouth')?.classList.remove('speaking');
     document.querySelector('.voice-bars')?.classList.remove('active');
 }};
-window._musicOn=false; window._musicNodes=[]; window._audioCtx=null;
+window._rei={on:false,nodes:[],ctx:null,mIdx:0,melTimer:null,spkTimer:null};
 
-/* ═══ REIHANA MUSIC ENGINE v2.0 ═══ */
-window.reiStartMusic=function(){{
-    if(window._musicOn)return;
-    try{{
-        let ctx=new(window.AudioContext||window.webkitAudioContext)();
-        if(ctx.state==='suspended')ctx.resume();
-        window._audioCtx=ctx; window._musicOn=true;
-        let master=ctx.createGain(); master.gain.value=0;
-        master.connect(ctx.destination);
-        /* Fade in doux */
-        master.gain.linearRampToValueAtTime(0.55, ctx.currentTime+3.5);
+window.startMusic=function(){{
+  if(window._rei.on)return;
+  try{{
+    let AC=window.AudioContext||window.webkitAudioContext;
+    let ctx=new AC(); window._rei.ctx=ctx; window._rei.on=true;
+    if(ctx.state==='suspended')ctx.resume();
 
-        /* ── BASSE PROFONDE pulsée ── */
-        function makeBass(){{
-            let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
-            o.type='sine'; o.frequency.value=55;
-            f.type='lowpass'; f.frequency.value=180; f.Q.value=4;
-            g.gain.value=0.55;
-            o.connect(f); f.connect(g); g.connect(master);
-            let lfo=ctx.createOscillator(),lg=ctx.createGain();
-            lfo.frequency.value=0.5; lg.gain.value=0.45;
-            lfo.connect(lg); lg.connect(g.gain);
-            o.start(); lfo.start();
-            window._musicNodes.push(o,g,f,lfo,lg);
-        }}
+    /* Master gain avec fade-in */
+    let master=ctx.createGain(); master.gain.setValueAtTime(0,ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0.6,ctx.currentTime+4);
+    master.connect(ctx.destination);
 
-        /* ── MÉLODIE PENTATONIQUE (notes IA) ── */
-        let melody=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];
-        let mIdx=0;
-        function playMelNote(){{
-            if(!window._musicOn)return;
-            let freq=melody[mIdx%melody.length];
-            mIdx++;
-            let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
-            o.type='triangle'; o.frequency.value=freq;
-            f.type='bandpass'; f.frequency.value=freq*2; f.Q.value=2;
-            let now=ctx.currentTime;
-            g.gain.setValueAtTime(0,now);
-            g.gain.linearRampToValueAtTime(0.18,now+0.06);
-            g.gain.exponentialRampToValueAtTime(0.001,now+1.2);
-            o.connect(f); f.connect(g); g.connect(master);
-            o.start(now); o.stop(now+1.3);
-            let delay=0.6+Math.random()*0.8;
-            setTimeout(playMelNote,delay*1000);
-        }}
-
-        /* ── NAPPE AMBIANTE (pad) ── */
-        [[110,0.08,0],[165,0.06,5],[220,0.05,-3],[330,0.04,8]].forEach(([freq,vol,det])=>{{
-            let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter(),rev=ctx.createDelay(2);
-            o.type='sawtooth'; o.frequency.value=freq; o.detune.value=det;
-            f.type='lowpass'; f.frequency.value=600; f.Q.value=0.5;
-            g.gain.value=vol;
-            rev.delayTime.value=0.35;
-            let revG=ctx.createGain(); revG.gain.value=0.4;
-            o.connect(f); f.connect(g); g.connect(master); g.connect(rev); rev.connect(revG); revG.connect(master);
-            let lfo=ctx.createOscillator(),lg=ctx.createGain();
-            lfo.frequency.value=0.08+Math.random()*0.05; lg.gain.value=vol*0.4;
-            lfo.connect(lg); lg.connect(g.gain);
-            o.start(); lfo.start();
-            window._musicNodes.push(o,g,f,lfo,lg,rev,revG);
-        }});
-
-        /* ── SCINTILLEMENTS AIGUS ── */
-        function sparkle(){{
-            if(!window._musicOn)return;
-            let freqs=[1046,1318,1568,2093];
-            let freq=freqs[Math.floor(Math.random()*freqs.length)];
-            let o=ctx.createOscillator(),g=ctx.createGain();
-            o.type='sine'; o.frequency.value=freq;
-            let now=ctx.currentTime;
-            g.gain.setValueAtTime(0,now);
-            g.gain.linearRampToValueAtTime(0.07,now+0.03);
-            g.gain.exponentialRampToValueAtTime(0.001,now+0.4);
-            o.connect(g); g.connect(master);
-            o.start(now); o.stop(now+0.45);
-            setTimeout(sparkle,800+Math.random()*1400);
-        }}
-
-        /* ── BATTEMENT BINAURALE (relaxation IA) ── */
-        let beat1=ctx.createOscillator(),beat2=ctx.createOscillator();
-        let bg1=ctx.createGain(),bg2=ctx.createGain();
-        beat1.frequency.value=200; beat2.frequency.value=207;
-        bg1.gain.value=0.04; bg2.gain.value=0.04;
-        beat1.connect(bg1); bg1.connect(master);
-        beat2.connect(bg2); bg2.connect(master);
-        beat1.start(); beat2.start();
-        window._musicNodes.push(beat1,beat2,bg1,bg2);
-
-        makeBass();
-        setTimeout(playMelNote, 800);
-        setTimeout(sparkle, 1200);
-
-        /* Affiche les barres musicales */
-        let wave=document.getElementById('rei-music-wave');
-        if(wave)wave.style.display='flex';
-        console.log('🎵 REIHANA Music Engine v2.0 démarré');
-    }}catch(e){{console.error('Audio Error:',e); window._musicOn=false;}}
-}};
-
-window.reiStopMusic=function(){{
-    window._musicOn=false;
-    if(window._audioCtx){{
-        let master=window._audioCtx.createGain();
-        master.gain.setValueAtTime(1,window._audioCtx.currentTime);
-        master.gain.linearRampToValueAtTime(0,window._audioCtx.currentTime+1.5);
+    /* Reverb simple */
+    function makeReverb(ctx,dur){{
+      let sr=ctx.sampleRate,len=sr*dur,buf=ctx.createBuffer(2,len,sr);
+      for(let c=0;c<2;c++){{let d=buf.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);}}
+      let n=ctx.createConvolver(); n.buffer=buf; return n;
     }}
-    setTimeout(function(){{
-        window._musicNodes.forEach(n=>{{try{{n.stop&&n.stop();n.disconnect&&n.disconnect();}}catch(e){{}}}});
-        window._musicNodes=[];
-        window._audioCtx?.close(); window._audioCtx=null;
-        let wave=document.getElementById('rei-music-wave');
-        if(wave)wave.style.display='none';
-    }},1600);
-}};
+    let rev=makeReverb(ctx,2.5);
+    let revG=ctx.createGain(); revG.gain.value=0.3;
+    rev.connect(revG); revG.connect(master);
 
-/* Alias compatibilité ancienne version */
-window.startMusic=window.reiStartMusic;
-window.stopMusic=window.reiStopMusic;
-
-/* ══ SYSTÈME CHANT REIHANA (futur) ══
-   Usage: window.reiSing("do ré mi fa sol")
-   Fréquences: do=261.6 ré=293.7 mi=329.6 fa=349.2 sol=392 la=440 si=493.9
-*/
-window.reiSing=function(notes){{
-    if(!window._audioCtx){{window.reiStartMusic(); setTimeout(()=>window.reiSing(notes),1000); return;}}
-    let ctx=window._audioCtx;
-    let noteMap={{'do':261.6,'re':293.7,'mi':329.6,'fa':349.2,'sol':392,'la':440,'si':493.9}};
-    let arr=notes.toLowerCase().split(' ');
-    let now=ctx.currentTime+0.2;
-    arr.forEach((n,i)=>{{
-        let freq=noteMap[n]||parseFloat(n)||440;
-        let o=ctx.createOscillator(),g=ctx.createGain(),vib=ctx.createOscillator(),vg=ctx.createGain();
-        o.type='sine'; o.frequency.value=freq;
-        vib.frequency.value=5.5; vg.gain.value=4;
-        vib.connect(vg); vg.connect(o.frequency);
-        g.gain.setValueAtTime(0,now+i*0.5);
-        g.gain.linearRampToValueAtTime(0.3,now+i*0.5+0.1);
-        g.gain.setValueAtTime(0.3,now+i*0.5+0.35);
-        g.gain.linearRampToValueAtTime(0,now+i*0.5+0.5);
-        o.connect(g); g.connect(ctx.destination);
-        o.start(now+i*0.5); vib.start(now+i*0.5);
-        o.stop(now+i*0.5+0.55); vib.stop(now+i*0.5+0.55);
+    /* BASSE PROFONDE pulsée */
+    [[55,0.5],[110,0.3]].forEach(([freq,vol])=>{{
+      let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+      o.type='sine'; o.frequency.value=freq; f.type='lowpass'; f.frequency.value=200;
+      g.gain.value=vol;
+      let lfo=ctx.createOscillator(),lg=ctx.createGain();
+      lfo.frequency.value=0.5; lg.gain.value=vol*0.6;
+      lfo.connect(lg); lg.connect(g.gain);
+      o.connect(f); f.connect(g); g.connect(master);
+      o.start(); lfo.start();
+      window._rei.nodes.push(o,g,f,lfo,lg);
     }});
+
+    /* NAPPE PAD ambiante */
+    [[165,0.08,0],[220,0.06,7],[330,0.05,-5],[440,0.04,3]].forEach(([freq,vol,det])=>{{
+      let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+      o.type='sawtooth'; o.frequency.value=freq; o.detune.value=det;
+      f.type='lowpass'; f.frequency.value=700; f.Q.value=0.8;
+      g.gain.value=vol;
+      let lfo=ctx.createOscillator(),lg=ctx.createGain();
+      lfo.frequency.value=0.09+Math.random()*0.06; lg.gain.value=vol*0.5;
+      lfo.connect(lg); lg.connect(g.gain);
+      o.connect(f); f.connect(g); g.connect(master); g.connect(rev);
+      o.start(); lfo.start();
+      window._rei.nodes.push(o,g,f,lfo,lg);
+    }});
+
+    /* MELODIE pentatonique */
+    let scale=[261.6,293.7,329.6,392,440,523.3,587.3,659.3,784];
+    function playNote(){{
+      if(!window._rei.on)return;
+      let freq=scale[window._rei.mIdx%scale.length];
+      window._rei.mIdx++;
+      let o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='triangle'; o.frequency.value=freq;
+      let now=ctx.currentTime;
+      g.gain.setValueAtTime(0,now);
+      g.gain.linearRampToValueAtTime(0.2,now+0.08);
+      g.gain.exponentialRampToValueAtTime(0.001,now+1.5);
+      o.connect(g); g.connect(master); g.connect(rev);
+      o.start(now); o.stop(now+1.6);
+      window._rei.melTimer=setTimeout(playNote,(700+Math.random()*900));
+    }}
+    setTimeout(playNote,1000);
+
+    /* SCINTILLEMENTS aigus */
+    function sparkle(){{
+      if(!window._rei.on)return;
+      let freqs=[1046,1318,1568,2093,2637];
+      let f=freqs[Math.floor(Math.random()*freqs.length)];
+      let o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine'; o.frequency.value=f;
+      let now=ctx.currentTime;
+      g.gain.setValueAtTime(0,now);
+      g.gain.linearRampToValueAtTime(0.06,now+0.03);
+      g.gain.exponentialRampToValueAtTime(0.001,now+0.5);
+      o.connect(g); g.connect(master);
+      o.start(now); o.stop(now+0.55);
+      window._rei.spkTimer=setTimeout(sparkle,900+Math.random()*1600);
+    }}
+    setTimeout(sparkle,1500);
+
+    /* Affiche barres */
+    let w=document.getElementById('rei-music-wave');
+    if(w)w.style.display='flex';
+    console.log('🎵 REIHANA Music ON');
+  }}catch(e){{console.error('Music error:',e);window._rei.on=false;}}
 }};
 
-if({str(st.session_state.music_on).lower()}){{setTimeout(window.reiStartMusic,800);}};
+window.stopMusic=function(){{
+  window._rei.on=false;
+  clearTimeout(window._rei.melTimer);
+  clearTimeout(window._rei.spkTimer);
+  window._rei.nodes.forEach(n=>{{try{{n.stop&&n.stop();n.disconnect&&n.disconnect();}}catch(e){{}}}});
+  window._rei.nodes=[];
+  if(window._rei.ctx){{window._rei.ctx.close();window._rei.ctx=null;}}
+  let w=document.getElementById('rei-music-wave');
+  if(w)w.style.display='none';
+}};
 
 window.playNotif=function(){{
-    try{{
-        let ctx=new(window.AudioContext||window.webkitAudioContext)();
-        if(ctx.state==='suspended')ctx.resume();
-        [523,659,784].forEach((f,i)=>{{
-            let o=ctx.createOscillator(),g=ctx.createGain();
-            o.frequency.value=f; o.type='sine';
-            g.gain.setValueAtTime(0.13,ctx.currentTime+i*0.13);
-            g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.13+0.25);
-            o.connect(g); g.connect(ctx.destination);
-            o.start(ctx.currentTime+i*0.13); o.stop(ctx.currentTime+i*0.13+0.28);
-        }});
-    }}catch(e){{}}
+  try{{
+    let ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended')ctx.resume();
+    [523,659,784].forEach((f,i)=>{{
+      let o=ctx.createOscillator(),g=ctx.createGain();
+      o.frequency.value=f; o.type='sine';
+      g.gain.setValueAtTime(0.13,ctx.currentTime+i*0.13);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.13+0.25);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime+i*0.13); o.stop(ctx.currentTime+i*0.13+0.28);
+    }});
+  }}catch(e){{}}
 }};
+if({str(st.session_state.music_on).lower()}){{setTimeout(window.startMusic,800);}}
 </script>""", unsafe_allow_html=True)
 
 def web_search(query, n=5):
@@ -845,12 +812,13 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        music_label = "🎵⏸" if st.session_state.music_on else "🎵▶"
-        if st.button(music_label, key="mbtn", use_container_width=True):
+        music_icon = "🎵⏸" if st.session_state.music_on else "🎵▶"
+        if st.button(music_icon, key="mbtn", use_container_width=True):
             st.session_state.music_on = not st.session_state.music_on
-            action = "window.reiStartMusic()" if st.session_state.music_on else "window.reiStopMusic()"
-            st.markdown(f"<script>setTimeout(function(){{ {action}; }}, 150);</script>", unsafe_allow_html=True)
-    st.markdown('<div id="rei-music-wave" style="display:none;" class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
+            action = "window.startMusic()" if st.session_state.music_on else "window.stopMusic()"
+            # PAS de st.rerun() ici - cela tuerait l AudioContext !
+            st.markdown(f"<script>setTimeout(function(){{ {action}; }},100);</script>", unsafe_allow_html=True)
+    st.markdown('<div id="rei-music-wave" style="display:' + ('flex' if st.session_state.music_on else 'none') + '" class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
@@ -959,7 +927,7 @@ for i,msg in enumerate(st.session_state.messages):
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
                 import streamlit.components.v1 as components
-                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
+                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:3000]
                 components.html(f"""<script>
                 var u = new SpeechSynthesisUtterance('{clean}');
                 u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5;
