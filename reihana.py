@@ -9,178 +9,6 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
 
-
-# ═══════════════════════════════════════════
-# PWA - BOUTON INSTALLER SUR MOBILE
-# ═══════════════════════════════════════════
-st.markdown("""
-<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlJFSUhBTkEgSUEiLAogICJzaG9ydF9uYW1lIjogIlJFSUhBTkEiLAogICJkZXNjcmlwdGlvbiI6ICJBc3Npc3RhbnRlIElBIHBhciBCaW55LUpvZSIsCiAgInN0YXJ0X3VybCI6ICIvIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDAwMDE1IiwKICAidGhlbWVfY29sb3IiOiAiIzAwZmZmZiIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImh0dHBzOi8vaW1nLmlrb25zOC5jb20vZW1vamkvNjAvcmhvZG9kZW5kcm9uLnBuZyIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIgogICAgfSwKICAgIHsKICAgICAgInNyYyI6ICJodHRwczovL2ltZy5pa29uczguY29tL2Vtb2ppLzUxMi9yaG9kb2RlbmRyb24ucG5nIiwKICAgICAgInNpemVzIjogIjUxMng1MTIiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciCiAgICB9CiAgXQp9">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="REIHANA IA">
-<meta name="theme-color" content="#000015">
-
-<style>
-#rei-install-banner {
-  display: none;
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 99999;
-  background: linear-gradient(135deg, rgba(0,10,30,0.97), rgba(0,5,20,0.97));
-  border: 1px solid rgba(0,255,255,0.5);
-  border-radius: 18px;
-  padding: 16px 22px;
-  box-shadow: 0 0 40px rgba(0,255,255,0.3), 0 8px 32px rgba(0,0,0,0.6);
-  width: min(360px, 92vw);
-  font-family: 'Rajdhani', sans-serif;
-  animation: slideUp 0.5s ease;
-}
-@keyframes slideUp {
-  from { transform: translateX(-50%) translateY(100px); opacity: 0; }
-  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
-}
-#rei-install-banner .rei-ib-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-#rei-install-banner .rei-ib-icon {
-  font-size: 2.2rem;
-  line-height: 1;
-}
-#rei-install-banner .rei-ib-title {
-  font-family: 'Orbitron', monospace;
-  color: #00ffff;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  line-height: 1.2;
-}
-#rei-install-banner .rei-ib-sub {
-  color: rgba(180,220,255,0.7);
-  font-size: 0.82rem;
-  letter-spacing: 1px;
-}
-#rei-install-banner .rei-ib-btns {
-  display: flex;
-  gap: 10px;
-}
-#rei-install-btn {
-  flex: 1;
-  background: linear-gradient(135deg, #00ffff, #0088ff);
-  color: #000015;
-  border: none;
-  border-radius: 10px;
-  padding: 11px 0;
-  font-family: 'Orbitron', monospace;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-#rei-install-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
-#rei-dismiss-btn {
-  background: rgba(255,255,255,0.07);
-  color: rgba(200,220,255,0.6);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
-  padding: 11px 16px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-#rei-dismiss-btn:hover { background: rgba(255,255,255,0.12); }
-</style>
-
-<!-- Bannière installation -->
-<div id="rei-install-banner">
-  <div class="rei-ib-top">
-    <div class="rei-ib-icon">🌸</div>
-    <div>
-      <div class="rei-ib-title">INSTALLER REIHANA</div>
-      <div class="rei-ib-sub">Accès rapide depuis votre écran d'accueil</div>
-    </div>
-  </div>
-  <div class="rei-ib-btns">
-    <button id="rei-install-btn">⬇ INSTALLER</button>
-    <button id="rei-dismiss-btn">Plus tard</button>
-  </div>
-</div>
-
-<script>
-(function(){
-  var deferredPrompt = null;
-  var banner = document.getElementById('rei-install-banner');
-  var installBtn = document.getElementById('rei-install-btn');
-  var dismissBtn = document.getElementById('rei-dismiss-btn');
-
-  // Écouter l'événement beforeinstallprompt (Chrome Android)
-  window.addEventListener('beforeinstallprompt', function(e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    // Afficher la bannière après 3 secondes
-    setTimeout(function() {
-      if(banner) banner.style.display = 'block';
-    }, 3000);
-  });
-
-  // Bouton Installer
-  if(installBtn) {
-    installBtn.addEventListener('click', function() {
-      if(deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(function(result) {
-          if(result.outcome === 'accepted') {
-            console.log('REIHANA installée !');
-          }
-          deferredPrompt = null;
-          if(banner) banner.style.display = 'none';
-        });
-      }
-    });
-  }
-
-  // Bouton Fermer
-  if(dismissBtn) {
-    dismissBtn.addEventListener('click', function() {
-      if(banner) banner.style.display = 'none';
-    });
-  }
-
-  // iOS Safari - pas de beforeinstallprompt, on détecte manuellement
-  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  var isInStandalone = window.navigator.standalone === true;
-  if(isIOS && !isInStandalone) {
-    setTimeout(function() {
-      var b = document.getElementById('rei-install-banner');
-      var ib = document.getElementById('rei-install-btn');
-      if(b && ib) {
-        // Modifier le bouton pour iOS
-        ib.textContent = '📱 AJOUTER À L\'ÉCRAN';
-        ib.onclick = function() {
-          alert('Sur iPhone/iPad :\n\n1. Appuyez sur le bouton Partager (⬆️)\n2. Faites défiler et tapez :\n   \"Sur l\'écran d\'accueil\"\n3. Appuyez sur \"Ajouter\"\n\n🌸 REIHANA sera sur votre écran !');
-          b.style.display = 'none';
-        };
-        b.style.display = 'block';
-      }
-    }, 3000);
-  }
-
-  // Masquer si déjà installée
-  window.addEventListener('appinstalled', function() {
-    if(banner) banner.style.display = 'none';
-    console.log('REIHANA installée avec succès');
-  });
-})();
-</script>
-""", unsafe_allow_html=True)
-
 # ═══════════════════════════════════════════
 # AVATAR BACKGROUND SEMI-RÉALISTE
 # ═══════════════════════════════════════════
@@ -561,21 +389,82 @@ setTimeout(window.reiEnterSend,1000);
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
-    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,900);
-    function doSpeak(voices){{
-        let u=new SpeechSynthesisUtterance(clean);
-        u.lang=window.reiConfig.lang; u.rate=window.reiConfig.rate; u.pitch=window.reiConfig.pitch; u.volume=1;
-        let fv=voices.filter(v=>v.lang.startsWith(window.reiConfig.lang.split('-')[0]));
-        let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/))||fv[0];
+
+    /* Nettoyage */
+    var clean=text
+        .replace(/\*\*(.*?)\*\*/g,'$1')
+        .replace(/\*(.*?)\*/g,'$1')
+        .replace(/<[^>]*>/g,'')
+        .replace(/[#`\[\]]/g,'')
+        .replace(/\n+/g,' ')
+        .trim();
+    if(!clean)return;
+
+    /* Découpage en morceaux <=180 chars - contourne bug Chrome 250 chars */
+    function splitChunks(str){{
+        var out=[], cur='';
+        var parts=str.split(/(?<=[.!?;])\s+/);
+        if(!parts||!parts.length)parts=[str];
+        for(var i=0;i<parts.length;i++){{
+            var s=parts[i].trim();
+            if(!s)continue;
+            var candidate=cur?cur+' '+s:s;
+            if(candidate.length<=180){{cur=candidate;}}
+            else{{
+                if(cur)out.push(cur);
+                if(s.length>180){{
+                    var sub='',subs=s.split(/,\s*/);
+                    for(var j=0;j<subs.length;j++){{
+                        var p=subs[j].trim();
+                        if(!p)continue;
+                        var c2=sub?sub+', '+p:p;
+                        if(c2.length<=180){{sub=c2;}}
+                        else{{if(sub)out.push(sub);sub=p;}}
+                    }}
+                    cur=sub;
+                }}else{{cur=s;}}
+            }}
+        }}
+        if(cur)out.push(cur);
+        return out.filter(function(c){{return c.trim().length>0;}});
+    }}
+
+    var chunks=splitChunks(clean);
+    if(!chunks.length)return;
+
+    function startV(){{
+        document.querySelector('.hologram-avatar')&&document.querySelector('.hologram-avatar').classList.add('speaking');
+        document.querySelector('.holo-mouth')&&document.querySelector('.holo-mouth').classList.add('speaking');
+        document.querySelector('.voice-bars')&&document.querySelector('.voice-bars').classList.add('active');
+        var av=document.getElementById('reiBgAvatar');if(av)av.classList.add('talking');
+    }}
+    function stopV(){{
+        document.querySelector('.hologram-avatar')&&document.querySelector('.hologram-avatar').classList.remove('speaking');
+        document.querySelector('.holo-mouth')&&document.querySelector('.holo-mouth').classList.remove('speaking');
+        document.querySelector('.voice-bars')&&document.querySelector('.voice-bars').classList.remove('active');
+        var av=document.getElementById('reiBgAvatar');if(av)av.classList.remove('talking');
+    }}
+
+    function speakOne(voices,idx){{
+        if(idx>=chunks.length){{stopV();return;}}
+        var u=new SpeechSynthesisUtterance(chunks[idx]);
+        u.lang=window.reiConfig.lang;
+        u.rate=window.reiConfig.rate;
+        u.pitch=window.reiConfig.pitch;
+        u.volume=1;
+        var fv=voices.filter(function(v){{return v.lang.startsWith(window.reiConfig.lang.split('-')[0]);}});
+        var fem=fv.find(function(v){{return /female|femme|amelie|marie|zira|paulina/i.test(v.name);}})||fv[0];
         if(fem)u.voice=fem;
-        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');}};
-        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');}};
+        if(idx===0)u.onstart=startV;
+        u.onend=function(){{setTimeout(function(){{speakOne(voices,idx+1);}},60);}};
+        u.onerror=function(){{setTimeout(function(){{speakOne(voices,idx+1);}},80);}};
         window.speechSynthesis.speak(u);
     }}
-    let vv=window.speechSynthesis.getVoices();
-    if(vv.length>0)doSpeak(vv);
-    else window.speechSynthesis.onvoiceschanged=()=>doSpeak(window.speechSynthesis.getVoices());
-}};
+
+    var vv=window.speechSynthesis.getVoices();
+    if(vv.length>0){{speakOne(vv,0);}}
+    else{{window.speechSynthesis.onvoiceschanged=function(){{speakOne(window.speechSynthesis.getVoices(),0);}};}}
+}}
 window.reihanaStop=function(){{
     window.speechSynthesis?.cancel();
     document.querySelector('.hologram-avatar')?.classList.remove('speaking');
@@ -1008,7 +897,7 @@ for i,msg in enumerate(st.session_state.messages):
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
                 import streamlit.components.v1 as components
-                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
+                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')
                 components.html(f"""<script>
                 var u = new SpeechSynthesisUtterance('{clean}');
                 u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5;
