@@ -16,14 +16,14 @@ st.markdown("""
 <div id="reiBackground" style="
   position:fixed;
   top:50%;
-  left:58%;
+  left:62%;
   transform:translate(-50%,-50%);
-  width:520px;
-  height:520px;
-  z-index:0;
+  width:750px;
+  height:750px;
+  z-index:1;
   pointer-events:none;
-  opacity:0.13;
-  filter:blur(0.5px);
+  opacity:0.72;
+  filter:drop-shadow(0 0 40px rgba(0,255,255,0.35));
 ">
 <svg viewBox="0 0 400 520" xmlns="http://www.w3.org/2000/svg" width="520" height="520">
   <defs>
