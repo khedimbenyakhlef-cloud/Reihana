@@ -9,6 +9,178 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
 
+
+# ═══════════════════════════════════════════
+# PWA - BOUTON INSTALLER SUR MOBILE
+# ═══════════════════════════════════════════
+st.markdown("""
+<link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlJFSUhBTkEgSUEiLAogICJzaG9ydF9uYW1lIjogIlJFSUhBTkEiLAogICJkZXNjcmlwdGlvbiI6ICJBc3Npc3RhbnRlIElBIHBhciBCaW55LUpvZSIsCiAgInN0YXJ0X3VybCI6ICIvIiwKICAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwKICAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDAwMDE1IiwKICAidGhlbWVfY29sb3IiOiAiIzAwZmZmZiIsCiAgImljb25zIjogWwogICAgewogICAgICAic3JjIjogImh0dHBzOi8vaW1nLmlrb25zOC5jb20vZW1vamkvNjAvcmhvZG9kZW5kcm9uLnBuZyIsCiAgICAgICJzaXplcyI6ICIxOTJ4MTkyIiwKICAgICAgInR5cGUiOiAiaW1hZ2UvcG5nIgogICAgfSwKICAgIHsKICAgICAgInNyYyI6ICJodHRwczovL2ltZy5pa29uczguY29tL2Vtb2ppLzUxMi9yaG9kb2RlbmRyb24ucG5nIiwKICAgICAgInNpemVzIjogIjUxMng1MTIiLAogICAgICAidHlwZSI6ICJpbWFnZS9wbmciCiAgICB9CiAgXQp9">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="REIHANA IA">
+<meta name="theme-color" content="#000015">
+
+<style>
+#rei-install-banner {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  background: linear-gradient(135deg, rgba(0,10,30,0.97), rgba(0,5,20,0.97));
+  border: 1px solid rgba(0,255,255,0.5);
+  border-radius: 18px;
+  padding: 16px 22px;
+  box-shadow: 0 0 40px rgba(0,255,255,0.3), 0 8px 32px rgba(0,0,0,0.6);
+  width: min(360px, 92vw);
+  font-family: 'Rajdhani', sans-serif;
+  animation: slideUp 0.5s ease;
+}
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+#rei-install-banner .rei-ib-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+#rei-install-banner .rei-ib-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+#rei-install-banner .rei-ib-title {
+  font-family: 'Orbitron', monospace;
+  color: #00ffff;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.2;
+}
+#rei-install-banner .rei-ib-sub {
+  color: rgba(180,220,255,0.7);
+  font-size: 0.82rem;
+  letter-spacing: 1px;
+}
+#rei-install-banner .rei-ib-btns {
+  display: flex;
+  gap: 10px;
+}
+#rei-install-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #00ffff, #0088ff);
+  color: #000015;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 0;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#rei-install-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+#rei-dismiss-btn {
+  background: rgba(255,255,255,0.07);
+  color: rgba(200,220,255,0.6);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+#rei-dismiss-btn:hover { background: rgba(255,255,255,0.12); }
+</style>
+
+<!-- Bannière installation -->
+<div id="rei-install-banner">
+  <div class="rei-ib-top">
+    <div class="rei-ib-icon">🌸</div>
+    <div>
+      <div class="rei-ib-title">INSTALLER REIHANA</div>
+      <div class="rei-ib-sub">Accès rapide depuis votre écran d'accueil</div>
+    </div>
+  </div>
+  <div class="rei-ib-btns">
+    <button id="rei-install-btn">⬇ INSTALLER</button>
+    <button id="rei-dismiss-btn">Plus tard</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var deferredPrompt = null;
+  var banner = document.getElementById('rei-install-banner');
+  var installBtn = document.getElementById('rei-install-btn');
+  var dismissBtn = document.getElementById('rei-dismiss-btn');
+
+  // Écouter l'événement beforeinstallprompt (Chrome Android)
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Afficher la bannière après 3 secondes
+    setTimeout(function() {
+      if(banner) banner.style.display = 'block';
+    }, 3000);
+  });
+
+  // Bouton Installer
+  if(installBtn) {
+    installBtn.addEventListener('click', function() {
+      if(deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function(result) {
+          if(result.outcome === 'accepted') {
+            console.log('REIHANA installée !');
+          }
+          deferredPrompt = null;
+          if(banner) banner.style.display = 'none';
+        });
+      }
+    });
+  }
+
+  // Bouton Fermer
+  if(dismissBtn) {
+    dismissBtn.addEventListener('click', function() {
+      if(banner) banner.style.display = 'none';
+    });
+  }
+
+  // iOS Safari - pas de beforeinstallprompt, on détecte manuellement
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  var isInStandalone = window.navigator.standalone === true;
+  if(isIOS && !isInStandalone) {
+    setTimeout(function() {
+      var b = document.getElementById('rei-install-banner');
+      var ib = document.getElementById('rei-install-btn');
+      if(b && ib) {
+        // Modifier le bouton pour iOS
+        ib.textContent = '📱 AJOUTER À L\'ÉCRAN';
+        ib.onclick = function() {
+          alert('Sur iPhone/iPad :\n\n1. Appuyez sur le bouton Partager (⬆️)\n2. Faites défiler et tapez :\n   \"Sur l\'écran d\'accueil\"\n3. Appuyez sur \"Ajouter\"\n\n🌸 REIHANA sera sur votre écran !');
+          b.style.display = 'none';
+        };
+        b.style.display = 'block';
+      }
+    }, 3000);
+  }
+
+  // Masquer si déjà installée
+  window.addEventListener('appinstalled', function() {
+    if(banner) banner.style.display = 'none';
+    console.log('REIHANA installée avec succès');
+  });
+})();
+</script>
+""", unsafe_allow_html=True)
+
 # ═══════════════════════════════════════════
 # AVATAR BACKGROUND SEMI-RÉALISTE
 # ═══════════════════════════════════════════
@@ -109,16 +281,14 @@ st.markdown("""
       80% { transform: translate(-5px,-1px); }
     }
     #bgLipT {
-      animation: bgTalk 0.2s ease-in-out infinite paused;
-      transform-origin: 200px 292px;
+      animation: bgTalk 0.3s ease-in-out infinite paused;
     }
     #reiBgAvatar.talking #bgLipT {
       animation-play-state: running;
     }
     @keyframes bgTalk {
-      0%,100% { transform: scaleY(1) translateY(0); }
-      25%     { transform: scaleY(0.1) translateY(-4px); }
-      75%     { transform: scaleY(2.2) translateY(5px); }
+      0%,100% { d: path("M170,295 C180,288 192,285 200,285 C208,285 220,288 230,295"); }
+      50% { d: path("M170,291 C180,282 192,278 200,278 C208,278 220,282 230,291"); }
     }
   </style>
 
@@ -391,86 +561,20 @@ setTimeout(window.reiEnterSend,1000);
 window.reihanaSpeak=function(text){{
     if(!window.speechSynthesis)return;
     window.speechSynthesis.cancel();
-    let clean=text
-        .replace(/\*\*(.*?)\*\*/g,'$1')
-        .replace(/\*(.*?)\*/g,'$1')
-        .replace(/<[^>]*>/g,'')
-        .replace(/[#`\[\]{{}}]/g,'')
-        .replace(/\n+/g,' ')
-        .trim();
-    if(!clean)return;
-
-    /* Découpage en morceaux de 180 chars max - contourne limite Chrome */
-    function splitChunks(str){{
-        var chunks=[];
-        var sentences=str.split(/(?<=[.!?;])\s+/);
-        if(!sentences||sentences.length===0)sentences=[str];
-        var cur='';
-        for(var i=0;i<sentences.length;i++){{
-            var s=sentences[i].trim();
-            if(!s)continue;
-            if((cur?(cur+' '+s):s).length<=180){{
-                cur=cur?(cur+' '+s):s;
-            }}else{{
-                if(cur)chunks.push(cur);
-                if(s.length>180){{
-                    var parts=s.split(/,\s*/);
-                    var sub='';
-                    for(var j=0;j<parts.length;j++){{
-                        var p=parts[j].trim();
-                        if(!p)continue;
-                        if((sub?(sub+', '+p):p).length<=180){{
-                            sub=sub?(sub+', '+p):p;
-                        }}else{{
-                            if(sub)chunks.push(sub);
-                            sub=p;
-                        }}
-                    }}
-                    cur=sub;
-                }}else{{
-                    cur=s;
-                }}
-            }}
-        }}
-        if(cur)chunks.push(cur);
-        return chunks.filter(function(c){{return c.trim().length>0;}});
-    }}
-
-    var chunks=splitChunks(clean);
-    if(chunks.length===0)return;
-
-    function startVisual(){{
-        document.querySelector('.hologram-avatar')?.classList.add('speaking');
-        document.querySelector('.holo-mouth')?.classList.add('speaking');
-        document.querySelector('.voice-bars')?.classList.add('active');
-        document.getElementById('reiBgAvatar')?.classList.add('talking');
-    }}
-    function stopVisual(){{
-        document.querySelector('.hologram-avatar')?.classList.remove('speaking');
-        document.querySelector('.holo-mouth')?.classList.remove('speaking');
-        document.querySelector('.voice-bars')?.classList.remove('active');
-        document.getElementById('reiBgAvatar')?.classList.remove('talking');
-    }}
-
-    function speakOne(voices,idx){{
-        if(idx>=chunks.length){{stopVisual();return;}}
-        var u=new SpeechSynthesisUtterance(chunks[idx]);
-        u.lang=window.reiConfig.lang;
-        u.rate=window.reiConfig.rate;
-        u.pitch=window.reiConfig.pitch;
-        u.volume=1;
-        var fv=voices.filter(function(v){{return v.lang.startsWith(window.reiConfig.lang.split('-')[0]);}});
-        var fem=fv.find(function(v){{return v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/);}})||fv[0];
+    let clean=text.replace(/\\*\\*(.*?)\\*\\*/g,'$1').replace(/\\*(.*?)\\*/g,'$1').replace(/<[^>]*>/g,'').replace(/[\\[\\]{{}}]/g,'').substring(0,900);
+    function doSpeak(voices){{
+        let u=new SpeechSynthesisUtterance(clean);
+        u.lang=window.reiConfig.lang; u.rate=window.reiConfig.rate; u.pitch=window.reiConfig.pitch; u.volume=1;
+        let fv=voices.filter(v=>v.lang.startsWith(window.reiConfig.lang.split('-')[0]));
+        let fem=fv.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina/))||fv[0];
         if(fem)u.voice=fem;
-        if(idx===0)u.onstart=startVisual;
-        u.onend=function(){{setTimeout(function(){{speakOne(voices,idx+1);}},60);}};
-        u.onerror=function(){{setTimeout(function(){{speakOne(voices,idx+1);}},80);}};
+        u.onstart=()=>{{document.querySelector('.hologram-avatar')?.classList.add('speaking');document.querySelector('.holo-mouth')?.classList.add('speaking');document.querySelector('.voice-bars')?.classList.add('active');}};
+        u.onend=()=>{{document.querySelector('.hologram-avatar')?.classList.remove('speaking');document.querySelector('.holo-mouth')?.classList.remove('speaking');document.querySelector('.voice-bars')?.classList.remove('active');}};
         window.speechSynthesis.speak(u);
     }}
-
-    var vv=window.speechSynthesis.getVoices();
-    if(vv.length>0)speakOne(vv,0);
-    else window.speechSynthesis.onvoiceschanged=function(){{speakOne(window.speechSynthesis.getVoices(),0);}};
+    let vv=window.speechSynthesis.getVoices();
+    if(vv.length>0)doSpeak(vv);
+    else window.speechSynthesis.onvoiceschanged=()=>doSpeak(window.speechSynthesis.getVoices());
 }};
 window.reihanaStop=function(){{
     window.speechSynthesis?.cancel();
@@ -478,89 +582,45 @@ window.reihanaStop=function(){{
     document.querySelector('.holo-mouth')?.classList.remove('speaking');
     document.querySelector('.voice-bars')?.classList.remove('active');
 }};
-window._rei={{on:false,nodes:[],ctx:null,mi:0,t1:null,t2:null}};
+window._musicOn=false; window._musicNodes=[]; window._audioCtx=null;
 window.startMusic=function(){{
-  if(window._rei.on)return;
-  try{{
-    let ctx=new(window.AudioContext||window.webkitAudioContext)();
-    if(ctx.state==='suspended')ctx.resume();
-    window._rei.ctx=ctx; window._rei.on=true;
-    let M=ctx.createGain(); M.gain.setValueAtTime(0,ctx.currentTime);
-    M.gain.linearRampToValueAtTime(0.55,ctx.currentTime+4);
-    M.connect(ctx.destination);
-    /* Reverb */
-    let rb=ctx.createBuffer(2,ctx.sampleRate*2.5,ctx.sampleRate);
-    for(let c=0;c<2;c++){{let d=rb.getChannelData(c);for(let i=0;i<rb.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/rb.length,2);}}
-    let rv=ctx.createConvolver(); rv.buffer=rb;
-    let rvG=ctx.createGain(); rvG.gain.value=0.28;
-    rv.connect(rvG); rvG.connect(M);
-    /* Basses */
-    [[55,0.5],[110,0.28]].forEach(function([f,v]){{
-      let o=ctx.createOscillator(),g=ctx.createGain(),fl=ctx.createBiquadFilter();
-      o.type='sine';o.frequency.value=f;fl.type='lowpass';fl.frequency.value=200;g.gain.value=v;
-      let lfo=ctx.createOscillator(),lg=ctx.createGain();
-      lfo.frequency.value=0.5;lg.gain.value=v*0.5;lfo.connect(lg);lg.connect(g.gain);
-      o.connect(fl);fl.connect(g);g.connect(M);o.start();lfo.start();
-      window._rei.nodes.push(o,g,fl,lfo,lg);
-    }});
-    /* Nappe pad */
-    [[165,0.09,0],[220,0.07,7],[330,0.05,-5],[440,0.04,3]].forEach(function([f,v,d]){{
-      let o=ctx.createOscillator(),g=ctx.createGain(),fl=ctx.createBiquadFilter();
-      o.type='sawtooth';o.frequency.value=f;o.detune.value=d;fl.type='lowpass';fl.frequency.value=700;g.gain.value=v;
-      let lfo=ctx.createOscillator(),lg=ctx.createGain();
-      lfo.frequency.value=0.09+Math.random()*0.05;lg.gain.value=v*0.5;lfo.connect(lg);lg.connect(g.gain);
-      o.connect(fl);fl.connect(g);g.connect(M);g.connect(rv);o.start();lfo.start();
-      window._rei.nodes.push(o,g,fl,lfo,lg);
-    }});
-    /* Mélodie */
-    var sc=[261.6,293.7,329.6,392,440,523.3,587.3,659.3];
-    function mel(){{
-      if(!window._rei.on)return;
-      let f=sc[window._rei.mi%sc.length];window._rei.mi++;
-      let o=ctx.createOscillator(),g=ctx.createGain();
-      o.type='triangle';o.frequency.value=f;
-      let n=ctx.currentTime;
-      g.gain.setValueAtTime(0,n);g.gain.linearRampToValueAtTime(0.22,n+0.09);g.gain.exponentialRampToValueAtTime(0.001,n+1.6);
-      o.connect(g);g.connect(M);g.connect(rv);o.start(n);o.stop(n+1.7);
-      window._rei.t1=setTimeout(mel,700+Math.random()*1000);
-    }}
-    /* Scintillements */
-    function sp(){{
-      if(!window._rei.on)return;
-      let fs=[1046,1318,1568,2093,2637],f=fs[Math.floor(Math.random()*fs.length)];
-      let o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f;
-      let n=ctx.currentTime;
-      g.gain.setValueAtTime(0,n);g.gain.linearRampToValueAtTime(0.065,n+0.03);g.gain.exponentialRampToValueAtTime(0.001,n+0.5);
-      o.connect(g);g.connect(M);o.start(n);o.stop(n+0.55);
-      window._rei.t2=setTimeout(sp,900+Math.random()*1700);
-    }}
-    setTimeout(mel,900); setTimeout(sp,1400);
-    let w=document.getElementById('rei-music-wave');if(w)w.style.display='flex';
-    console.log('🎵 REIHANA Music ON');
-  }}catch(e){{console.error('Music:',e);window._rei.on=false;}}
+    if(window._musicOn)return; window._musicOn=true;
+    try{{
+        let ctx=new(window.AudioContext||window.webkitAudioContext)();
+        window._audioCtx=ctx;
+        [[55,0.04,0],[110,0.03,5],[220,0.025,-3],[329.6,0.018,0],[440,0.012,8],[660,0.008,-5]].forEach(([freq,vol,det])=>{{
+            let o=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+            o.type='sine'; o.frequency.value=freq; if(det)o.detune.value=det;
+            g.gain.value=vol; f.type='lowpass'; f.frequency.value=800;
+            let lfo=ctx.createOscillator(),lg=ctx.createGain();
+            lfo.frequency.value=0.07+Math.random()*0.05; lg.gain.value=vol*0.3;
+            o.connect(f); f.connect(g); g.connect(ctx.destination);
+            lfo.connect(lg); lg.connect(g.gain);
+            o.start(); lfo.start();
+            window._musicNodes.push(o,g,lfo,lg);
+        }});
+    }}catch(e){{console.log('audio',e);}}
 }};
 window.stopMusic=function(){{
-  window._rei.on=false;
-  clearTimeout(window._rei.t1);clearTimeout(window._rei.t2);
-  window._rei.nodes.forEach(function(n){{try{{n.stop&&n.stop();n.disconnect&&n.disconnect();}}catch(e){{}}}});
-  window._rei.nodes=[];
-  if(window._rei.ctx){{window._rei.ctx.close();window._rei.ctx=null;}}
-  let w=document.getElementById('rei-music-wave');if(w)w.style.display='none';
+    window._musicOn=false;
+    window._musicNodes.forEach(n=>{{try{{n.stop();n.disconnect();}}catch(e){{}}}});
+    window._musicNodes=[];
+    window._audioCtx?.close(); window._audioCtx=null;
 }};
 window.playNotif=function(){{
-  try{{
-    let ctx=new(window.AudioContext||window.webkitAudioContext)();
-    if(ctx.state==='suspended')ctx.resume();
-    [523,659,784].forEach(function(f,i){{
-      let o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=f;o.type='sine';
-      g.gain.setValueAtTime(0.13,ctx.currentTime+i*0.13);
-      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.13+0.25);
-      o.connect(g);g.connect(ctx.destination);
-      o.start(ctx.currentTime+i*0.13);o.stop(ctx.currentTime+i*0.13+0.28);
-    }});
-  }}catch(e){{}}
+    try{{
+        let ctx=new(window.AudioContext||window.webkitAudioContext)();
+        [523,659,784].forEach((f,i)=>{{
+            let o=ctx.createOscillator(),g=ctx.createGain();
+            o.frequency.value=f; o.type='sine';
+            g.gain.setValueAtTime(0.12,ctx.currentTime+i*0.12);
+            g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+i*0.12+0.22);
+            o.connect(g); g.connect(ctx.destination);
+            o.start(ctx.currentTime+i*0.12); o.stop(ctx.currentTime+i*0.12+0.25);
+        }});
+    }}catch(e){{}}
 }};
-if({str(st.session_state.music_on).lower()}){{setTimeout(window.startMusic,800);}}
+if({str(st.session_state.music_on).lower()}){{setTimeout(window.startMusic,600);}}
 </script>""", unsafe_allow_html=True)
 
 def web_search(query, n=5):
@@ -833,13 +893,13 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        music_icon = "🎵⏸" if st.session_state.music_on else "🎵▶"
-        if st.button(music_icon, key="mbtn", use_container_width=True):
+        if st.button("🎵"+"▶" if not st.session_state.music_on else "🎵"+"⏸", key="mbtn"):
             st.session_state.music_on = not st.session_state.music_on
             action = "window.startMusic()" if st.session_state.music_on else "window.stopMusic()"
-            st.markdown(f"<script>setTimeout(function(){{{{ {action}; }}}},150);</script>", unsafe_allow_html=True)
-    wave_display = "flex" if st.session_state.music_on else "none"
-    st.markdown(f'<div id="rei-music-wave" style="display:{wave_display}" class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
+            st.markdown(f"<script>{action};</script>", unsafe_allow_html=True)
+            st.rerun()
+    if st.session_state.music_on:
+        st.markdown('<div class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
@@ -948,7 +1008,7 @@ for i,msg in enumerate(st.session_state.messages):
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
                 import streamlit.components.v1 as components
-                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')
+                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')[:300]
                 components.html(f"""<script>
                 var u = new SpeechSynthesisUtterance('{clean}');
                 u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5;
