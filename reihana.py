@@ -509,7 +509,16 @@ window.playNotif=function(){{
         }});
     }}catch(e){{}}
 }};
-if({str(st.session_state.music_on).lower()}){{setTimeout(window.startMusic,600);}}
+var reiAudio=document.getElementById('reiMusicPlayer');
+  reiAudio=document.createElement('audio');
+  reiAudio.id='reiMusicPlayer';
+  reiAudio.loop=true;
+  reiAudio.volume=0.4;
+  reiAudio.src='https://cdn.pixabay.com/audio/2024/11/18/audio_b5e7c67a53.mp3';
+  document.body.appendChild(reiAudio);
+}}
+if({str(st.session_state.music_on).lower()}){{reiAudio.play().catch(e=>console.log(e));}}
+else{{reiAudio.pause();}}
 </script>""", unsafe_allow_html=True)
 
 def web_search(query, n=5):
@@ -782,10 +791,9 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        st.markdown("""<audio id='reiMusic' loop style='display:none'>
-        <source src='https://cdn.pixabay.com/audio/2024/11/18/audio_b5e7c67a53.mp3' type='audio/mpeg'>
-        </audio>
-        <button onclick="var a=document.getElementById('reiMusic');if(a.paused){{a.play();this.innerHTML='🎵⏸'}}else{{a.pause();this.innerHTML='🎵▶'}}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.8rem;">🎵▶</button>""", unsafe_allow_html=True)
+        if st.button("🎵▶" if not st.session_state.music_on else "🎵⏸", key="mbtn"):
+            st.session_state.music_on = not st.session_state.music_on
+            st.rerun()
     if st.session_state.music_on:
         st.markdown('<div class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
 
