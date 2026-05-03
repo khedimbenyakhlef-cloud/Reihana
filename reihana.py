@@ -18,47 +18,180 @@ sys.path.insert(0, str(Path(__file__).parent / "backend"))
 # ═══════════════════════════════════════════
 # REIHANA TTS - VRAIE VOIX FEMININE gTTS
 # ═══════════════════════════════════════════
-def reihana_tts(text, lang="fr"):
-    """Genere un audio MP3 base64 avec gTTS - vraie voix feminine"""
+def detect_text_lang(text):
+    """Détecte la langue du texte automatiquement"""
+    ar_chars = sum(1 for c in text if '\u0600' <= c <= '\u06FF')
+    if ar_chars > len(text) * 0.15:
+        return "ar"
+    en_words = ['the','is','are','what','how','who','can','you','please','help','tell','me','my','your','i','we','they','this','that']
+    words = text.lower().split()
+    en_count = sum(1 for w in words[:20] if w in en_words)
+    if en_count >= 2:
+        return "en"
+    return "fr"
+
+def smart_chunk_text(text, max_chars=450):
+    """Découpe le texte en morceaux intelligents pour gTTS"""
+    # Nettoyage Markdown
+    import re
+    clean = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    clean = re.sub(r'\*(.*?)\*', r'\1', clean)
+    clean = re.sub(r'#+ ', '', clean)
+    clean = re.sub(r'`[^`]*`', '', clean)
+    clean = re.sub(r'<[^>]+>', '', clean)
+    clean = re.sub(r'\[.*?\]\(.*?\)', '', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    
+    if len(clean) <= max_chars:
+        return [clean]
+    
+    # Découper sur les ponctuations
+    chunks = []
+    current = ""
+    # Séparateurs: . ! ? ; pour FR/EN, et ۔ . ؟ ! pour AR
+    separators = re.split(r'(?<=[.!?;،۔؟])\s+', clean)
+    
+    for part in separators:
+        part = part.strip()
+        if not part:
+            continue
+        candidate = (current + " " + part).strip() if current else part
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            # Si le morceau lui-même est trop long, couper sur les virgules
+            if len(part) > max_chars:
+                sub_parts = re.split(r'(?<=[,،])\s+', part)
+                sub_current = ""
+                for sp in sub_parts:
+                    sp = sp.strip()
+                    if not sp:
+                        continue
+                    sub_candidate = (sub_current + " " + sp).strip() if sub_current else sp
+                    if len(sub_candidate) <= max_chars:
+                        sub_current = sub_candidate
+                    else:
+                        if sub_current:
+                            chunks.append(sub_current)
+                        sub_current = sp[:max_chars]
+                if sub_current:
+                    chunks.append(sub_current)
+                current = ""
+            else:
+                current = part
+    if current:
+        chunks.append(current)
+    
+    return [c for c in chunks if c.strip()]
+
+def reihana_tts(text, lang=None):
+    """Génère un audio MP3 base64 avec gTTS - voix féminine multilingue"""
     if not GTTS_OK:
         return None
     try:
-        clean = text[:280].replace("*","").replace("#","").replace("`","")
-        lang_map = {"fr": "fr", "ar": "ar", "en": "en"}
-        gtts_lang = lang_map.get(lang, "fr")
-        tts = gTTS(text=clean, lang=gtts_lang, slow=False)
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-            tts.save(f.name)
-            fname = f.name
-        with open(fname, "rb") as af:
-            b64 = base64.b64encode(af.read()).decode()
-        os.unlink(fname)
+        # Auto-détection de la langue si non précisée
+        if lang is None:
+            lang = detect_text_lang(text)
+        
+        # Mapping langue UI → code gTTS
+        lang_map = {
+            "fr": "fr", "🇫🇷 Français": "fr",
+            "ar": "ar", "🇩🇿 العربية": "ar",
+            "en": "en", "🇬🇧 English": "en"
+        }
+        gtts_lang = lang_map.get(lang, detect_text_lang(text))
+        
+        # Découpage intelligent
+        chunks = smart_chunk_text(text, max_chars=450)
+        if not chunks:
+            return None
+        
+        # Générer chaque chunk et concaténer les MP3
+        all_audio = b""
+        for chunk in chunks[:6]:  # max 6 chunks pour éviter timeout
+            if not chunk.strip():
+                continue
+            try:
+                tts = gTTS(text=chunk, lang=gtts_lang, slow=False)
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                    tts.save(f.name)
+                    fname = f.name
+                with open(fname, "rb") as af:
+                    all_audio += af.read()
+                os.unlink(fname)
+            except Exception:
+                continue
+        
+        if not all_audio:
+            return None
+        
+        b64 = base64.b64encode(all_audio).decode()
         return b64
-    except Exception as e:
+    except Exception:
         return None
 
-def play_reihana_voice(text, lang="fr", mood="calm"):
-    """Joue la voix de REIHANA avec la bonne musique selon le mood"""
+def play_reihana_voice(text, lang=None, mood="calm"):
+    """Joue la voix gTTS de REIHANA avec animation avatar"""
     b64 = reihana_tts(text, lang)
     if b64:
-        st.markdown(
-            f'''<audio id="reiVoice" autoplay style="display:none">
-            <source src="data:audio/mp3;base64,{b64}" type="audio/mpeg">
-            </audio>
-            <script>
-            setTimeout(function(){{
-                var v=document.getElementById("reiVoice");
-                if(v){{
-                    if(window.reiChangeMood) window.reiChangeMood("{mood}");
-                    v.play().catch(function(){{}});
-                    v.onended=function(){{
-                        if(window.reiChangeMood) window.reiChangeMood("{mood}");
-                    }};
-                }}
-            }}, 300);
-            </script>''',
-            unsafe_allow_html=True
-        )
+        import streamlit.components.v1 as _comp
+        audio_html = f"""
+<audio id="reiVoiceGTTS" style="display:none">
+  <source src="data:audio/mp3;base64,{b64}" type="audio/mpeg">
+</audio>
+<script>
+(function(){{
+  var v = document.getElementById("reiVoiceGTTS");
+  if(!v) return;
+  
+  function startTalking(){{
+    // Animation avatar petit
+    var av = window.parent.document.getElementById("reiBgAvatar");
+    if(av) av.classList.add("talking");
+    var hm = window.parent.document.querySelector(".holo-mouth");
+    if(hm) hm.classList.add("speaking");
+    var vb = window.parent.document.querySelector(".voice-bars");
+    if(vb) vb.classList.add("active");
+    var ha = window.parent.document.querySelector(".hologram-avatar");
+    if(ha) ha.classList.add("speaking");
+    // Anim bouche sidebar SVG
+    var lp = window.parent.document.getElementById("lipT");
+    if(lp) lp.style.animationPlayState = "running";
+  }}
+  
+  function stopTalking(){{
+    var av = window.parent.document.getElementById("reiBgAvatar");
+    if(av) av.classList.remove("talking");
+    var hm = window.parent.document.querySelector(".holo-mouth");
+    if(hm) hm.classList.remove("speaking");
+    var vb = window.parent.document.querySelector(".voice-bars");
+    if(vb) vb.classList.remove("active");
+    var ha = window.parent.document.querySelector(".hologram-avatar");
+    if(ha) ha.classList.remove("speaking");
+  }}
+  
+  v.onplay = startTalking;
+  v.onended = stopTalking;
+  v.onerror = stopTalking;
+  
+  // Lancer avec délai pour contourner autoplay browser policy
+  setTimeout(function(){{
+    v.play().then(function(){{
+      startTalking();
+    }}).catch(function(e){{
+      console.log("gTTS autoplay bloqué:", e);
+      // Essayer après interaction utilisateur
+      document.addEventListener("click", function _once(){{
+        v.play();
+        document.removeEventListener("click", _once);
+      }}, {{once: true}});
+    }});
+  }}, 400);
+}})();
+</script>"""
+        _comp.html(audio_html, height=0)
         return True
     return False
 
@@ -952,14 +1085,8 @@ for i,msg in enumerate(st.session_state.messages):
                 st.toast(T["copied"])
         with cc:
             if st.button("🔊 Lire", key=f"sp{i}", use_container_width=True):
-                import streamlit.components.v1 as components
-                clean = msg["content"].replace("'"," ").replace('"',' ').replace('`',' ').replace(chr(10),' ')
-                components.html(f"""<script>
-                var u = new SpeechSynthesisUtterance('{clean}');
-                u.lang = window.reiConfig ? window.reiConfig.lang : 'fr-FR'; u.rate = window.reiConfig ? window.reiConfig.rate : 1.1; u.pitch = window.reiConfig ? window.reiConfig.pitch : 1.5;
-                var vx=window.speechSynthesis.getVoices(); var fv=vx.filter(v=>v.lang.startsWith(u.lang.split('-')[0])); if(fv[0])u.voice=fv[0];
-                window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-                </script>""", height=0)
+                _detected_lang = detect_text_lang(msg["content"])
+                play_reihana_voice(msg["content"], lang=_detected_lang)
         with cd:
             if st.button("🔄 Regen", key=f"rg{i}", use_container_width=True):
                 if i>0 and st.session_state.messages[i-1]["role"]=="user":
@@ -983,7 +1110,8 @@ if st.session_state.regen_index is not None:
         rep,res,_=process_msg(q,regen=True,regen_idx=idx)
         st.session_state.messages[idx]["content"]=rep
         st.session_state.mémoire.add_exchange(st.session_state.user_id,q,rep)
-        st.markdown(f"<script>setTimeout(()=>{{window.playNotif();setTimeout(()=>window.reihanaSpeak('{safe_js(rep)}'),400);}},200);</script>", unsafe_allow_html=True)
+        _regen_lang = detect_text_lang(rep)
+        play_reihana_voice(rep, lang=_regen_lang)
     st.session_state.regen_index=None; st.session_state.regen_question=""; st.rerun()
 
 if send_btn and user_input and user_input.strip():
@@ -998,7 +1126,9 @@ if send_btn and user_input and user_input.strip():
     st.session_state.mémoire.add_exchange(st.session_state.user_id,question,rep)
     st.session_state.messages.append({"role":"assistant","content":rep})
     st.markdown(f'<div style="font-family:Orbitron,monospace;font-size:0.57rem;color:rgba(150,150,200,0.38);text-align:right;margin:-3px 0 5px 0;">⚡ {res.get("model","")[:26]} · {res.get("tokens",0)} tokens</div>', unsafe_allow_html=True)
-    st.markdown(f"<script>setTimeout(()=>{{window.playNotif();setTimeout(()=>window.reihanaSpeak('{safe_js(rep)}'),400);}},200);</script>", unsafe_allow_html=True)
+    # Auto-lecture gTTS après réponse IA
+    _auto_lang = detect_text_lang(rep)
+    play_reihana_voice(rep, lang=_auto_lang)
     st.rerun()
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
@@ -1010,5 +1140,6 @@ for i,(col,sug) in enumerate(zip(scols,T["suggestions"])):
             st.session_state.messages.append({"role":"user","content":sug})
             rep,res,_=process_msg(sug)
             st.session_state.messages.append({"role":"assistant","content":rep})
-            st.markdown(f"<script>setTimeout(()=>{{window.playNotif();setTimeout(()=>window.reihanaSpeak('{safe_js(rep)}'),400);}},200);</script>", unsafe_allow_html=True)
+            _sug_lang = detect_text_lang(rep)
+            play_reihana_voice(rep, lang=_sug_lang)
             st.rerun()
