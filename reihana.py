@@ -793,22 +793,17 @@ with st.sidebar:
     with cm:
         st.components.v1.html("""
 <style>
-body{margin:0;padding:0;background:transparent;}
-#mbtn{
-  background:#1a0044;
-  color:#00ffcc;
-  border:2px solid #00ffcc;
-  border-radius:8px;
-  padding:6px 14px;
-  cursor:pointer;
-  font-size:0.9rem;
-  width:100%;
-  display:block;
-}
-#mbtn:hover{background:#2a0066;box-shadow:0 0 10px #00ffcc;}
+body{margin:0;padding:2px;background:transparent;}
+#mbtn{background:#1a0044;color:#00ffcc;border:2px solid #00ffcc;
+border-radius:8px;padding:6px 14px;cursor:pointer;font-size:0.9rem;
+width:100%;display:block;transition:all 0.3s;}
+#mbtn:hover{background:#2a0066;box-shadow:0 0 12px #00ffcc;}
+#mood-label{color:#7700ff;font-size:0.6rem;font-family:monospace;
+text-align:center;margin-top:2px;letter-spacing:1px;}
 </style>
 <audio id="ra" loop></audio>
 <button id="mbtn" onclick="toggleM(this)">🎵▶</button>
+<div id="mood-label">AMBIENT</div>
 <script>
 var SONGS={
   calm:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
@@ -817,13 +812,17 @@ var SONGS={
   sad:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
   mystery:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
 };
+var MOOD_NAMES={
+  calm:"AMBIENT",happy:"JOYEUX",epic:"EPIQUE",sad:"MELANCOLIQUE",mystery:"MYSTERIEUX"
+};
 var aud=document.getElementById("ra");
-aud.volume=0.45;
+var lbl=document.getElementById("mood-label");
+aud.volume=0.4;
 aud.src=SONGS.calm;
 
 function toggleM(btn){
   if(aud.paused){
-    aud.play().then(function(){btn.innerText="🎵⏸";}).catch(function(e){console.log(e);});
+    aud.play().then(function(){btn.innerText="🎵⏸";}).catch(function(e){});
   }else{
     aud.pause();
     btn.innerText="🎵▶";
@@ -832,9 +831,9 @@ function toggleM(btn){
 
 function changeMood(mood){
   var url=SONGS[mood]||SONGS.calm;
-  if(aud.src.indexOf(url)<0){
+  lbl.innerText=MOOD_NAMES[mood]||"AMBIENT";
+  if(aud.src.indexOf(url.split("/").pop())<0){
     var playing=!aud.paused;
-    var t=aud.currentTime;
     aud.src=url;
     if(playing){aud.play().catch(function(){});}
   }
@@ -844,21 +843,25 @@ function reiSpeak(text,lang){
   if(!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
   var u=new SpeechSynthesisUtterance(text);
-  if(lang==="ar"){u.lang="ar-SA";u.rate=0.82;u.pitch=1.2;}
+  if(lang==="ar"){u.lang="ar-SA";u.rate=0.80;u.pitch=1.25;}
   else if(lang==="en"){u.lang="en-US";u.rate=0.88;u.pitch=1.1;}
-  else{u.lang="fr-FR";u.rate=0.85;u.pitch=1.15;}
+  else{u.lang="fr-FR";u.rate=0.84;u.pitch=1.18;}
   u.volume=1.0;
-  var oldVol=aud.volume;
-  aud.volume=0.08;
-  u.onend=function(){aud.volume=0.45;};
-  u.onerror=function(){aud.volume=0.45;};
+  aud.volume=0.06;
+  u.onend=function(){
+    var fade=setInterval(function(){
+      if(aud.volume<0.38){aud.volume=Math.min(aud.volume+0.04,0.4);}
+      else{clearInterval(fade);}
+    },80);
+  };
+  u.onerror=function(){aud.volume=0.4;};
   window.speechSynthesis.speak(u);
 }
 
 window.reiSpeak=reiSpeak;
 window.reiChangeMood=changeMood;
 </script>
-""", height=55)
+""", height=68)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
