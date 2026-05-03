@@ -782,9 +782,7 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        if st.button("🎵"+"▶" if not st.session_state.music_on else "🎵"+"⏸", key="mbtn"):
-            st.session_state.music_on = not st.session_state.music_on
-            st.rerun()
+        st.markdown("""<button onclick="if(window._musicOn){{window.stopMusic();this.innerHTML='🎵▶'}}else{{window.startMusic();this.innerHTML='🎵⏸'}}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.8rem;">🎵▶</button>""", unsafe_allow_html=True)
     if st.session_state.music_on:
         st.markdown('<div class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
 
