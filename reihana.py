@@ -1767,8 +1767,8 @@ _cmp.html(f"""
 """, height=0)
 
 
-# ── Zone saisie : textarea + boutons ──
-ci, cmic, cs2 = st.columns([4, 1, 1])
+# ── Zone saisie : textarea + bouton MICRO + bouton STOP + bouton ENVOYER ──
+ci, cmic, cstop, cs2 = st.columns([4, 1, 1, 1])
 with ci:
     if st.session_state.clear_input:
         st.session_state.input_value=""; st.session_state.clear_input=False; st.rerun()
@@ -1776,17 +1776,19 @@ with ci:
     st.session_state.input_value=user_input
 with cmic:
     st.markdown("<br>", unsafe_allow_html=True)
-    _mic_on = st.session_state.get("mic_on", False)
-    _mic_label = "⏹ STOP" if _mic_on else "🎙️ MICRO"
-    if st.button(_mic_label, use_container_width=True, key="micbtn"):
-        st.session_state.mic_on = not _mic_on
-        # JS appelé via components.html séparé (pas st.markdown)
+    if st.button("🎙️ MICRO", use_container_width=True, key="micbtn"):
+        st.session_state.mic_on = True
         import streamlit.components.v1 as _mc2
-        _mc2.html(f"""<script>
-        (function(){{
-          var fn = window.parent.{'reiMicStop' if _mic_on else 'reiMicStart'};
-          if(fn) fn();
-        }})();
+        _mc2.html("""<script>
+        (function(){ var fn=window.parent.reiMicStart; if(fn) fn(); })();
+        </script>""", height=0)
+with cstop:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("⏹ STOP", use_container_width=True, key="stopbtn"):
+        st.session_state.mic_on = False
+        import streamlit.components.v1 as _mc3
+        _mc3.html("""<script>
+        (function(){ var fn=window.parent.reiMicStop; if(fn) fn(); })();
         </script>""", height=0)
 with cs2:
     st.markdown("<br>", unsafe_allow_html=True)
