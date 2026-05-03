@@ -1686,6 +1686,27 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
 
 <script>
 (function(){{
+  // ══════════════════════════════════════════════════════
+  // SOLUTION IFRAME MICROPHONE :
+  // SpeechRecognition est bloqué dans les iframes sans
+  // l'attribut allow="microphone". On contourne en ajoutant
+  // cet attribut sur notre propre iframe dynamiquement.
+  // ══════════════════════════════════════════════════════
+
+  // Ajouter allow="microphone" sur CETTE iframe dans le parent
+  (function fixMicPermission(){{
+    try {{
+      var frames = window.parent.document.querySelectorAll("iframe");
+      frames.forEach(function(f) {{
+        // Ajouter microphone à tous les iframes Streamlit
+        var cur = f.getAttribute("allow") || "";
+        if (cur.indexOf("microphone") === -1) {{
+          f.setAttribute("allow", (cur ? cur + "; " : "") + "microphone");
+        }}
+      }});
+    }} catch(e) {{}}
+  }})();
+
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   var rec=null,on=false,allFin="",rafId=null,an=null;
   var lang="{_stt_lang}";
@@ -1721,7 +1742,9 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
           b.style.height=Math.max(2,Math.min(14,d[Math.floor(i*d.length/9)]/6))+"px";
         }});
       }})();
-    }}).catch(function(){{}});
+    }}).catch(function(e){{
+      setSt("err","🚫 Micro refusé: "+e.message);
+    }});
   }}
 
   function mkRec(){{
@@ -1740,13 +1763,19 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
         if(ev.results[i].isFinal)allFin+=ev.results[i][0].transcript+" ";
         else itr+=ev.results[i][0].transcript;
       }}
-      // ✨ FRAPPE EN TEMPS RÉEL dans le textarea
+      // ✨ FRAPPE EN TEMPS RÉEL dans le textarea (même document = ça marche)
       ta.value=(allFin+itr).trim();
       ta.scrollTop=ta.scrollHeight;
       setSt("on","🔴 "+(allFin+itr).trim().slice(-45));
     }};
     r.onerror=function(ev){{
-      var m={{"not-allowed":"🚫 Autoriser le micro dans Chrome","no-speech":"💬 Rien entendu","network":"🌐 Erreur réseau","aborted":"⏹"}};
+      var m={{
+        "not-allowed":"🚫 Cliquer 🔒 dans Chrome → Autoriser le micro",
+        "no-speech":"💬 Rien entendu — réessayez",
+        "network":"🌐 Erreur réseau",
+        "aborted":"⏹ Arrêté",
+        "service-not-allowed":"🚫 HTTPS requis ou micro bloqué"
+      }};
       setSt("err",m[ev.error]||("⚠️ "+ev.error));
       stopRec();
     }};
@@ -1755,10 +1784,19 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
   }}
 
   function startRec(){{
-    if(!SR){{setSt("err","⚠️ Chrome/Edge requis");return;}}
+    if(!SR){{setSt("err","⚠️ Chrome ou Edge requis");return;}}
     if(on)return;
+    // Re-appliquer la permission micro avant de démarrer
+    try{{
+      var frames=window.parent.document.querySelectorAll("iframe");
+      frames.forEach(function(f){{
+        var cur=f.getAttribute("allow")||"";
+        if(cur.indexOf("microphone")===-1)
+          f.setAttribute("allow",(cur?cur+"; ":"")+"microphone");
+      }});
+    }}catch(e){{}}
     allFin="";rec=mkRec();
-    try{{rec.start();}}catch(e){{setSt("err","⚠️ Vérifier autorisation micro");}}
+    try{{rec.start();}}catch(e){{setSt("err","⚠️ "+e.message);}}
   }}
 
   function stopRec(){{
