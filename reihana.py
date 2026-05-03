@@ -1591,11 +1591,11 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale v6 — st.button natif + JS ──
+# ── Reconnaissance vocale v7 — Architecture correcte ──
 _stt_lang_map = {"🇫🇷 Français":"fr-FR","🇩🇿 العربية":"ar-SA","🇬🇧 English":"en-US"}
 _stt_lang = _stt_lang_map.get(st.session_state.langue,"fr-FR")
 
-# ── Lire texte vocal depuis query params ──
+# ── Lire texte vocal depuis query params (mis par JS) ──
 _qp = st.query_params
 _vt = _qp.get("vt","").strip()
 _vs = _qp.get("vs","0")
@@ -1616,7 +1616,6 @@ if _vt and _vt != st.session_state.get("last_voice_text",""):
             st.markdown(_wh, unsafe_allow_html=True)
         st.session_state.mémoire.add_exchange(st.session_state.user_id,_question,_rep)
         st.session_state.messages.append({"role":"assistant","content":_rep})
-        st.markdown(f'<div style="font-family:Orbitron,monospace;font-size:0.57rem;color:rgba(150,150,200,0.38);text-align:right;margin:-3px 0 5px 0;">⚡ {_res.get("model","")[:26]} · {_res.get("tokens",0)} tokens</div>', unsafe_allow_html=True)
         _is_song,_smood,_slang,_sverses = detect_song(_rep)
         if _is_song and _sverses:
             st.session_state.last_song={"verses":_sverses,"mood":_smood,"lang":_slang,"msg_index":len(st.session_state.messages)-1}
@@ -1624,65 +1623,55 @@ if _vt and _vt != st.session_state.get("last_voice_text",""):
             play_reihana_voice(_rep, lang=detect_text_lang(_rep))
         st.rerun()
 
-# ── Injecter le moteur JS de reconnaissance vocale ──
-# (définit reiMicStart/reiMicStop dans window, cliquable via st.button)
-st.markdown(f"""
+# ── CSS uniquement (pas de script ici) ──
+st.markdown("""
 <style>
-#reiVoiceStatus{{
-  font-family:'Orbitron',monospace;
-  font-size:9px;letter-spacing:2px;
-  color:rgba(0,255,200,0.5);
-  padding:4px 0 2px 2px;
-  height:15px;
-  transition:color 0.2s;
-}}
-#reiVoiceStatus.on{{color:#ff3333;animation:rvs_blink 0.85s ease-in-out infinite;}}
-#reiVoiceStatus.ok{{color:#00ff88;}}
-#reiVoiceStatus.err{{color:#ffaa00;font-size:8px;}}
-@keyframes rvs_blink{{0%,100%{{opacity:0.45;}}50%{{opacity:1;}}}}
-#reiVoiceLive{{
-  font-family:'Rajdhani',monospace;font-size:13px;
-  color:#88ccff;font-style:italic;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  padding:0 2px;min-height:18px;
-  transition:color 0.2s;
-}}
-#reiVoiceLive.final{{color:#ccffee;font-style:normal;font-weight:700;}}
-#reiWaveBars{{
-  display:flex;align-items:flex-end;gap:2px;
-  height:18px;padding:2px 0;
-  opacity:0;transition:opacity 0.3s;
-}}
-#reiWaveBars.on{{opacity:1;}}
-.rwbar{{
-  width:3px;border-radius:2px;min-height:2px;
-  background:linear-gradient(0deg,#00ffcc,#8800ff);
-  transition:height 0.055s;
-}}
+#reiVoiceBox{font-family:'Orbitron',monospace;padding:5px 2px 3px 2px;}
+#reiVoiceSt{font-size:8.5px;letter-spacing:2px;color:rgba(0,255,200,0.45);height:13px;margin-bottom:3px;}
+#reiVoiceSt.von{color:#ff3333;}
+#reiVoiceSt.vok{color:#00ff88;}
+#reiVoiceSt.verr{color:#ffaa00;font-size:8px;}
+#reiVoiceLv{font-family:'Rajdhani',monospace;font-size:13px;color:#88ccff;
+            font-style:italic;white-space:nowrap;overflow:hidden;
+            text-overflow:ellipsis;min-height:17px;}
+#reiVoiceLv.vfin{color:#ccffee;font-style:normal;font-weight:700;}
+#reiWv{display:flex;align-items:flex-end;gap:2px;height:16px;margin-top:3px;opacity:0;transition:opacity .3s;}
+#reiWv.von{opacity:1;}
+.rwb2{width:3px;border-radius:2px;min-height:2px;
+      background:linear-gradient(0deg,#00ffcc,#8800ff);transition:height .06s;}
 </style>
-<div id="reiVoiceStatus">🎙️ MICRO PRÊT — CLIQUER LE BOUTON CI-DESSOUS</div>
-<div id="reiVoiceLive">Parle à REIHANA et elle te répondra... 👂</div>
-<div id="reiWaveBars">
-  <div class="rwbar" style="height:2px"></div><div class="rwbar" style="height:5px"></div>
-  <div class="rwbar" style="height:9px"></div><div class="rwbar" style="height:13px"></div>
-  <div class="rwbar" style="height:16px"></div><div class="rwbar" style="height:13px"></div>
-  <div class="rwbar" style="height:9px"></div><div class="rwbar" style="height:5px"></div>
-  <div class="rwbar" style="height:2px"></div>
+<div id="reiVoiceBox">
+  <div id="reiVoiceSt">🎙️ MICRO PRÊT</div>
+  <div id="reiVoiceLv">Parle à REIHANA... 👂</div>
+  <div id="reiWv">
+    <div class="rwb2" style="height:2px"></div><div class="rwb2" style="height:5px"></div>
+    <div class="rwb2" style="height:9px"></div><div class="rwb2" style="height:13px"></div>
+    <div class="rwb2" style="height:15px"></div><div class="rwb2" style="height:13px"></div>
+    <div class="rwb2" style="height:9px"></div><div class="rwb2" style="height:5px"></div>
+    <div class="rwb2" style="height:2px"></div>
+  </div>
 </div>
+""", unsafe_allow_html=True)
+
+# ── JS dans components.html (seul endroit où <script> fonctionne) ──
+import streamlit.components.v1 as _cmp
+_cmp.html(f"""
 <script>
 (function(){{
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  var rec=null, on=false, final_="", silT=null, rafId=null, an=null;
+  var rec=null,on=false,fin="",silT=null,rafId=null,an=null;
   var lang="{_stt_lang}";
-  var st_=document.getElementById("reiVoiceStatus");
-  var lv=document.getElementById("reiVoiceLive");
-  var wb=document.getElementById("reiWaveBars");
-  var bars=wb?wb.querySelectorAll(".rwbar"):[];
-  var defH=[2,5,9,13,16,13,9,5,2];
 
-  if(!SR){{
-    if(st_){{st_.innerText="⚠️ Chrome/Edge requis pour le micro";st_.style.color="#ffaa00";st_.style.animation="none";}}
-    return;
+  // Accéder aux éléments dans le document parent
+  function el(id){{
+    return window.parent.document.getElementById(id);
+  }}
+
+  function setSt(cls,txt){{
+    var e=el("reiVoiceSt"); if(e){{e.className=cls;e.innerText=txt;}}
+  }}
+  function setLv(cls,txt){{
+    var e=el("reiVoiceLv"); if(e){{e.className=cls;e.innerText=txt;}}
   }}
 
   function startVis(){{
@@ -1693,11 +1682,19 @@ st.markdown(f"""
       an=ctx.createAnalyser();an.fftSize=64;
       ctx.createMediaStreamSource(stream).connect(an);
       var d=new Uint8Array(an.frequencyBinCount);
-      if(wb)wb.classList.add("on");
+      var wv=el("reiWv"); if(wv)wv.classList.add("von");
+      var def=[2,5,9,13,15,13,9,5,2];
       (function draw(){{
-        if(!on){{if(wb)wb.classList.remove("on");bars.forEach(function(b,i){{b.style.height=defH[i]+"px";}});an=null;return;}}
-        rafId=requestAnimationFrame(draw);an.getByteFrequencyData(d);
-        bars.forEach(function(b,i){{b.style.height=Math.max(2,Math.min(16,d[Math.floor(i*(d.length/9))]/6))+"px";}});
+        if(!on){{
+          var wv2=el("reiWv");
+          if(wv2){{wv2.classList.remove("von");
+            wv2.querySelectorAll(".rwb2").forEach(function(b,i){{b.style.height=def[i]+"px";}});}}
+          an=null;return;
+        }}
+        rafId=requestAnimationFrame(draw);
+        an.getByteFrequencyData(d);
+        var bs=window.parent.document.querySelectorAll(".rwb2");
+        bs.forEach(function(b,i){{b.style.height=Math.max(2,Math.min(15,d[Math.floor(i*(d.length/9))]/6))+"px";}});
       }})();
     }}).catch(function(){{}});
   }}
@@ -1706,63 +1703,69 @@ st.markdown(f"""
     var r=new SR();
     r.lang=lang;r.continuous=true;r.interimResults=true;r.maxAlternatives=2;
     r.onstart=function(){{
-      on=true;final_="";
-      if(st_){{st_.className="on";st_.innerText="🔴 ÉCOUTE EN COURS... (silence 3s = envoi auto)";}}
-      if(lv){{lv.className="";lv.innerText="Je t'écoute... 🎙️";}}
+      on=true;fin="";
+      setSt("von","🔴 ÉCOUTE... (silence 3s = envoi auto)");
+      setLv("","Je t'écoute 🎙️");
       startVis();
     }};
     r.onresult=function(e){{
-      var itr="";final_="";
+      var itr="";fin="";
       for(var i=e.resultIndex;i<e.results.length;i++){{
-        if(e.results[i].isFinal)final_+=e.results[i][0].transcript+" ";
+        if(e.results[i].isFinal)fin+=e.results[i][0].transcript+" ";
         else itr+=e.results[i][0].transcript;
       }}
-      var show=(final_+itr).trim();
-      if(lv){{lv.className=final_.trim()?"final":"";lv.innerText=show.substring(0,80)+(show.length>80?"...":"")||"...";}}
+      var show=(fin+itr).trim();
+      setLv(fin.trim()?"vfin":"",show.substring(0,80)+(show.length>80?"...":"")||"...");
       clearTimeout(silT);
-      if(final_.trim())silT=setTimeout(function(){{if(on&&final_.trim())window.reiMicStop(true);}},3000);
+      if(fin.trim())silT=setTimeout(function(){{if(on&&fin.trim())stopRec(true);}},3000);
     }};
     r.onerror=function(ev){{
-      var msgs={{"not-allowed":"🚫 MICRO REFUSÉ — cliquer 🔒 dans Chrome → Autoriser",
-                 "no-speech":"💬 Rien entendu — réessayez","network":"🌐 Erreur réseau","aborted":"⏹ Arrêté"}};
-      if(st_){{st_.className="err";st_.innerText=msgs[ev.error]||("⚠️ "+ev.error);}}
-      window.reiMicStop(false);
+      var msgs={{"not-allowed":"🚫 REFUSÉ — cliquer 🔒 dans Chrome → Autoriser",
+                 "no-speech":"💬 Rien entendu","network":"🌐 Erreur réseau","aborted":"⏹"}};
+      setSt("verr",msgs[ev.error]||("⚠️ "+ev.error));
+      stopRec(false);
     }};
-    r.onend=function(){{if(on){{try{{r.start();}}catch(x){{on=false;}}}}  }};
+    r.onend=function(){{if(on){{try{{r.start();}}catch(x){{on=false;setSt("","🎙️ MICRO PRÊT");}}}}  }};
     return r;
   }}
 
-  window.reiMicStart=function(){{
+  function startRec(){{
+    if(!SR){{setSt("verr","⚠️ Chrome/Edge requis");return;}}
     if(on)return;
-    final_="";rec=mkRec();
+    fin="";rec=mkRec();
     try{{rec.start();}}
-    catch(e){{if(st_){{st_.className="err";st_.innerText="⚠️ Impossible — vérifier autorisation micro";}}}}
-  }};
+    catch(e){{setSt("verr","⚠️ Vérifier autorisation micro dans Chrome");}}
+  }}
 
-  window.reiMicStop=function(autoSend){{
+  function stopRec(autoSend){{
     on=false;clearTimeout(silT);cancelAnimationFrame(rafId);
     if(rec){{try{{rec.stop();rec.abort();}}catch(e){{}}rec=null;}}
-    var t=final_.trim();
+    var t=fin.trim();
     if(t){{
-      if(st_){{st_.className="ok";st_.innerText=autoSend?"✅ ENVOI EN COURS...":"✅ TEXTE CAPTURÉ";}}
-      if(lv){{lv.className="final";lv.innerText=t.substring(0,70)+(t.length>70?"...":"");}}
-      var url=window.location.pathname+"?vt="+encodeURIComponent(t)+"&vs="+(autoSend?"1":"0");
-      window.location.href=url;
+      setSt("vok",autoSend?"✅ ENVOI AUTO...":"✅ TEXTE PRÊT");
+      setLv("vfin",t.substring(0,70)+(t.length>70?"...":""));
+      // Rediriger avec le texte → Streamlit le lit via query_params
+      var url=window.parent.location.pathname
+              +"?vt="+encodeURIComponent(t)
+              +"&vs="+(autoSend?"1":"0");
+      window.parent.location.href=url;
     }}else{{
-      if(st_){{st_.className="";st_.innerText="🎙️ MICRO PRÊT — CLIQUER LE BOUTON CI-DESSOUS";}}
-      if(lv){{lv.className="";lv.innerText="Parle à REIHANA et elle te répondra... 👂";}}
+      setSt("","🎙️ MICRO PRÊT");
+      setLv("","Parle à REIHANA... 👂");
     }}
-  }};
+  }}
 
-  window.reiMicToggle=function(){{
-    if(on)window.reiMicStop(false);else window.reiMicStart();
-  }};
+  // Exposer dans la fenêtre PARENTE pour que st.button puisse appeler
+  window.parent.reiMicStart=startRec;
+  window.parent.reiMicStop=function(){{stopRec(false);}};
+  window.parent.reiMicToggle=function(){{if(on)stopRec(false);else startRec();}};
+
 }})();
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 
-# ── Zone saisie : texte + bouton micro natif + envoyer ──
+# ── Zone saisie : textarea + boutons ──
 ci, cmic, cs2 = st.columns([4, 1, 1])
 with ci:
     if st.session_state.clear_input:
@@ -1771,16 +1774,18 @@ with ci:
     st.session_state.input_value=user_input
 with cmic:
     st.markdown("<br>", unsafe_allow_html=True)
-    # Vrai bouton Streamlit natif — cliquable à 100%
-    _mic_label = "⏹ STOP" if st.session_state.get("mic_on", False) else "🎙️ MICRO"
+    _mic_on = st.session_state.get("mic_on", False)
+    _mic_label = "⏹ STOP" if _mic_on else "🎙️ MICRO"
     if st.button(_mic_label, use_container_width=True, key="micbtn"):
-        st.session_state.mic_on = not st.session_state.get("mic_on", False)
-        # Déclencher reiMicToggle() défini dans le JS ci-dessus
-        st.markdown("""<script>
-        setTimeout(function(){
-            if(window.reiMicToggle) window.reiMicToggle();
-        }, 150);
-        </script>""", unsafe_allow_html=True)
+        st.session_state.mic_on = not _mic_on
+        # JS appelé via components.html séparé (pas st.markdown)
+        import streamlit.components.v1 as _mc2
+        _mc2.html(f"""<script>
+        (function(){{
+          var fn = window.parent.{'reiMicStop' if _mic_on else 'reiMicStart'};
+          if(fn) fn();
+        }})();
+        </script>""", height=0)
 with cs2:
     st.markdown("<br>", unsafe_allow_html=True)
     send_btn=st.button(T["send"], use_container_width=True, key="sbtn")
