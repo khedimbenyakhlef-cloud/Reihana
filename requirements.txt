@@ -5,3 +5,5 @@ requests>=2.31.0
 pathlib
 websockets
 websockets
+gtts
+gtts

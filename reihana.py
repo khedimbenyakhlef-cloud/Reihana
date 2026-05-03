@@ -4,10 +4,63 @@ Fondée par Khedim Benyakhlef (Biny-Joe)
 """
 import streamlit as st
 import sys, os, json, time, tempfile, urllib.request, urllib.parse
+import base64
+try:
+    from gtts import gTTS
+    GTTS_OK = True
+except:
+    GTTS_OK = False
 from pathlib import Path
 from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / "backend"))
+
+# ═══════════════════════════════════════════
+# REIHANA TTS - VRAIE VOIX FEMININE gTTS
+# ═══════════════════════════════════════════
+def reihana_tts(text, lang="fr"):
+    """Genere un audio MP3 base64 avec gTTS - vraie voix feminine"""
+    if not GTTS_OK:
+        return None
+    try:
+        clean = text[:280].replace("*","").replace("#","").replace("`","")
+        lang_map = {"fr": "fr", "ar": "ar", "en": "en"}
+        gtts_lang = lang_map.get(lang, "fr")
+        tts = gTTS(text=clean, lang=gtts_lang, slow=False)
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+            tts.save(f.name)
+            fname = f.name
+        with open(fname, "rb") as af:
+            b64 = base64.b64encode(af.read()).decode()
+        os.unlink(fname)
+        return b64
+    except Exception as e:
+        return None
+
+def play_reihana_voice(text, lang="fr", mood="calm"):
+    """Joue la voix de REIHANA avec la bonne musique selon le mood"""
+    b64 = reihana_tts(text, lang)
+    if b64:
+        st.markdown(
+            f'''<audio id="reiVoice" autoplay style="display:none">
+            <source src="data:audio/mp3;base64,{b64}" type="audio/mpeg">
+            </audio>
+            <script>
+            setTimeout(function(){{
+                var v=document.getElementById("reiVoice");
+                if(v){{
+                    if(window.reiChangeMood) window.reiChangeMood("{mood}");
+                    v.play().catch(function(){{}});
+                    v.onended=function(){{
+                        if(window.reiChangeMood) window.reiChangeMood("{mood}");
+                    }};
+                }}
+            }}, 300);
+            </script>''',
+            unsafe_allow_html=True
+        )
+        return True
+    return False
 
 # ═══════════════════════════════════════════
 # AVATAR BACKGROUND SEMI-RÉALISTE
