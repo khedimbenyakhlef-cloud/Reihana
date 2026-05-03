@@ -792,54 +792,73 @@ with st.sidebar:
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
         st.components.v1.html("""
-<audio id='ra' loop></audio>
-<button id='mbtn' onclick="toggleMusic(this)" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">🎵▶</button>
+<style>
+body{margin:0;padding:0;background:transparent;}
+#mbtn{
+  background:#1a0044;
+  color:#00ffcc;
+  border:2px solid #00ffcc;
+  border-radius:8px;
+  padding:6px 14px;
+  cursor:pointer;
+  font-size:0.9rem;
+  width:100%;
+  display:block;
+}
+#mbtn:hover{background:#2a0066;box-shadow:0 0 10px #00ffcc;}
+</style>
+<audio id="ra" loop></audio>
+<button id="mbtn" onclick="toggleM(this)">🎵▶</button>
 <script>
 var SONGS={
-  calm:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-  happy:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-  epic:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  sad:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-  mystery:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3'
+  calm:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  happy:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  epic:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  sad:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+  mystery:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
 };
-var audio=document.getElementById('ra');
-audio.volume=0.5;
-audio.src=SONGS.calm;
+var aud=document.getElementById("ra");
+aud.volume=0.45;
+aud.src=SONGS.calm;
 
-function toggleMusic(btn){
-  if(audio.paused){
-    audio.play().then(()=>{btn.innerText='🎵⏸';}).catch(()=>{});
+function toggleM(btn){
+  if(aud.paused){
+    aud.play().then(function(){btn.innerText="🎵⏸";}).catch(function(e){console.log(e);});
   }else{
-    audio.pause();
-    btn.innerText='🎵▶';
+    aud.pause();
+    btn.innerText="🎵▶";
   }
 }
 
 function changeMood(mood){
   var url=SONGS[mood]||SONGS.calm;
-  if(audio.src.indexOf(url)<0){
-    audio.src=url;
-    if(playing)audio.play().catch(()=>{});
+  if(aud.src.indexOf(url)<0){
+    var playing=!aud.paused;
+    var t=aud.currentTime;
+    aud.src=url;
+    if(playing){aud.play().catch(function(){});}
   }
 }
 
 function reiSpeak(text,lang){
+  if(!window.speechSynthesis)return;
   window.speechSynthesis.cancel();
   var u=new SpeechSynthesisUtterance(text);
-  if(lang==='ar'){u.lang='ar-SA';u.rate=0.82;u.pitch=1.2;}
-  else if(lang==='en'){u.lang='en-US';u.rate=0.88;u.pitch=1.1;}
-  else{u.lang='fr-FR';u.rate=0.85;u.pitch=1.15;}
+  if(lang==="ar"){u.lang="ar-SA";u.rate=0.82;u.pitch=1.2;}
+  else if(lang==="en"){u.lang="en-US";u.rate=0.88;u.pitch=1.1;}
+  else{u.lang="fr-FR";u.rate=0.85;u.pitch=1.15;}
   u.volume=1.0;
-  audio.volume=0.1;
-  u.onend=function(){audio.volume=0.5;};
-  u.onerror=function(){audio.volume=0.5;};
+  var oldVol=aud.volume;
+  aud.volume=0.08;
+  u.onend=function(){aud.volume=0.45;};
+  u.onerror=function(){aud.volume=0.45;};
   window.speechSynthesis.speak(u);
 }
 
 window.reiSpeak=reiSpeak;
 window.reiChangeMood=changeMood;
-<\/script>
-""", height=50)
+</script>
+""", height=55)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
