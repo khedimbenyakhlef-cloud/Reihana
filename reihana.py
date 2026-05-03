@@ -782,7 +782,10 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        st.markdown("""<button id='mbtn' onclick="var p=window.parent||window;if(p._musicOn){{p.stopMusic();this.innerHTML='🎵▶'}}else{{p.startMusic();this.innerHTML='🎵⏸'}}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.8rem;">🎵▶</button>""", unsafe_allow_html=True)
+        st.markdown("""<audio id='reiMusic' loop style='display:none'>
+        <source src='https://cdn.pixabay.com/audio/2024/11/18/audio_b5e7c67a53.mp3' type='audio/mpeg'>
+        </audio>
+        <button onclick="var a=document.getElementById('reiMusic');if(a.paused){{a.play();this.innerHTML='🎵⏸'}}else{{a.pause();this.innerHTML='🎵▶'}}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.8rem;">🎵▶</button>""", unsafe_allow_html=True)
     if st.session_state.music_on:
         st.markdown('<div class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
 
