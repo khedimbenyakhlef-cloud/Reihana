@@ -806,12 +806,53 @@ text-align:center;margin-top:2px;letter-spacing:1px;}
 <div id="mood-label">AMBIENT</div>
 <script>
 var SONGS={
-  calm:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  happy:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  epic:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  sad:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-  mystery:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+  calm:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3"
+  ],
+  happy:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-14.mp3"
+  ],
+  epic:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"
+  ],
+  sad:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-17.mp3"
+  ],
+  mystery:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-16.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-13.mp3"
+  ],
+  romantic:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3"
+  ],
+  tech:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-15.mp3"
+  ],
+  arabic:[
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-10.mp3"
+  ]
 };
+function pickSong(mood){
+  var list=SONGS[mood]||SONGS.calm;
+  return list[Math.floor(Math.random()*list.length)];
+}
 var MOOD_NAMES={
   calm:"AMBIENT",happy:"JOYEUX",epic:"EPIQUE",sad:"MELANCOLIQUE",mystery:"MYSTERIEUX"
 };
@@ -830,13 +871,11 @@ function toggleM(btn){
 }
 
 function changeMood(mood){
-  var url=SONGS[mood]||SONGS.calm;
+  var url=pickSong(mood);
   lbl.innerText=MOOD_NAMES[mood]||"AMBIENT";
-  if(aud.src.indexOf(url.split("/").pop())<0){
-    var playing=!aud.paused;
-    aud.src=url;
-    if(playing){aud.play().catch(function(){});}
-  }
+  var playing=!aud.paused;
+  aud.src=url;
+  if(playing){aud.play().catch(function(){});}
 }
 
 function reiSpeak(text,lang){
