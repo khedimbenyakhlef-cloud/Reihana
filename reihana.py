@@ -791,7 +791,42 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        st.components.v1.html("""<audio id='ra' loop><source src='https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' type='audio/mpeg'></audio><button onclick="var a=document.getElementById('ra');if(a.paused){a.play();this.innerText='🎵⏸'}else{a.pause();this.innerText='🎵▶'}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">🎵▶</button>""", height=45)
+        st.components.v1.html("""
+<audio id='ra' loop volume='0.5'></audio>
+<button id='mbtn' onclick="
+  var a=document.getElementById('ra');
+  var songs={
+    'calm':'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    'happy':'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+    'epic':'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    'sad':'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+    'mystery':'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3'
+  };
+  window._reiSongs=songs;
+    a.play();this.innerText='🎵⏸';
+  }else{a.pause();this.innerText='🎵▶';}
+" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">🎵▶</button>
+<script>
+window.reiSpeak=function(text,lang){
+  window.speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance(text);
+  if(lang=='ar'){u.lang='ar-SA';u.rate=0.85;u.pitch=1.2;}
+  else if(lang=='en'){u.lang='en-US';u.rate=0.9;u.pitch=1.1;}
+  else{u.lang='fr-FR';u.rate=0.88;u.pitch=1.15;}
+  u.volume=0.9;
+  window.speechSynthesis.speak(u);
+};
+window.reiChangeMood=function(mood){
+  var a=document.getElementById('ra');
+  var songs=window._reiSongs||{};
+  var url=songs[mood]||songs['calm'];
+    var t=a.currentTime;
+    a.src=url;
+    a.play();
+  }
+};
+<\/script>
+""", height=50)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
