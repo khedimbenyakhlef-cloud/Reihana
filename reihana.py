@@ -784,8 +784,6 @@ with st.sidebar:
     with cm:
         if st.button("🎵"+"▶" if not st.session_state.music_on else "🎵"+"⏸", key="mbtn"):
             st.session_state.music_on = not st.session_state.music_on
-            action = "window.startMusic()" if st.session_state.music_on else "window.stopMusic()"
-            st.markdown(f"<script>{action};</script>", unsafe_allow_html=True)
             st.rerun()
     if st.session_state.music_on:
         st.markdown('<div class="music-wave"><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div><div class="music-bar"></div></div>', unsafe_allow_html=True)
