@@ -514,7 +514,7 @@ var reiAudio=document.getElementById('reiMusicPlayer');
   reiAudio.id='reiMusicPlayer';
   reiAudio.loop=true;
   reiAudio.volume=0.4;
-  reiAudio.src='https://cdn.pixabay.com/audio/2024/11/18/audio_b5e7c67a53.mp3';
+  reiAudio.src='https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
   document.body.appendChild(reiAudio);
 }}
 if({str(st.session_state.music_on).lower()}){{reiAudio.play().catch(e=>console.log(e));}}
@@ -791,7 +791,7 @@ with st.sidebar:
     cs, cm = st.columns([2,1])
     with cs: st.markdown(f'<span class="status-online"></span><span style="color:#00ff88;font-family:Orbitron,monospace;font-size:0.65rem;letter-spacing:2px;">{T["online"]}</span>', unsafe_allow_html=True)
     with cm:
-        st.components.v1.html("""<audio id='ra' loop><source src='https://cdn.pixabay.com/audio/2024/11/18/audio_b5e7c67a53.mp3' type='audio/mpeg'></audio><button onclick="var a=document.getElementById('ra');if(a.paused){a.play();this.innerText='🎵⏸'}else{a.pause();this.innerText='🎵▶'}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">🎵▶</button>""", height=45)
+        st.components.v1.html("""<audio id='ra' loop><source src='https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' type='audio/mpeg'></audio><button onclick="var a=document.getElementById('ra');if(a.paused){a.play();this.innerText='🎵⏸'}else{a.pause();this.innerText='🎵▶'}" style="background:#1a0044;color:#00ffcc;border:1px solid #00ffcc;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.85rem;">🎵▶</button>""", height=45)
 
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     st.markdown('<div class="stat-badge">👤 PROFIL</div>', unsafe_allow_html=True)
