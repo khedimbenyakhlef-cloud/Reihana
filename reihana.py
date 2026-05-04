@@ -971,8 +971,10 @@ def get_fernet():
         return None
 
 def encrypt_conversation(question, reponse):
-    """Chiffre une conversation et la sauvegarde"""
+    """Chiffre une conversation et la stocke en session_state (pas de fichier)"""
     try:
+        if not st.session_state.conv_encrypted:
+            return
         f = get_fernet()
         if not f:
             return
@@ -982,30 +984,28 @@ def encrypt_conversation(question, reponse):
             "user": st.session_state.user_id
         })
         encrypted = f.encrypt(data.encode()).decode()
-        log_path = Path("memory") / "conversations.enc"
-        log_path.parent.mkdir(exist_ok=True)
-        with open(log_path, "a") as fp:
-            fp.write(encrypted + "\n")
+        if "conv_enc_log" not in st.session_state:
+            st.session_state.conv_enc_log = []
+        st.session_state.conv_enc_log.append(encrypted)
+        # Garder max 100 en mémoire
+        if len(st.session_state.conv_enc_log) > 100:
+            st.session_state.conv_enc_log = st.session_state.conv_enc_log[-100:]
     except:
         pass
 
 def decrypt_conversations():
-    """Déchiffre et retourne les conversations stockées"""
+    """Déchiffre et retourne les conversations depuis session_state"""
     try:
         f = get_fernet()
         if not f:
             return []
-        log_path = Path("memory") / "conversations.enc"
-        if not log_path.exists():
-            return []
         results = []
-        for line in log_path.read_text().strip().split("\n"):
-            if line.strip():
-                try:
-                    decrypted = json.loads(f.decrypt(line.encode()).decode())
-                    results.append(decrypted)
-                except:
-                    pass
+        for line in st.session_state.get("conv_enc_log", []):
+            try:
+                decrypted = json.loads(f.decrypt(line.encode()).decode())
+                results.append(decrypted)
+            except:
+                pass
         return results
     except:
         return []
@@ -1045,7 +1045,7 @@ def get_geolocation():
             return "Position inconnue"
 
 def handle_suspicious_question(question, flag):
-    """Gère une question suspecte : log + alerte"""
+    """Gère une question suspecte : log en session_state uniquement (pas de fichier)"""
     location = get_geolocation()
     alert = {
         "ts": datetime.now().isoformat(),
@@ -1055,15 +1055,9 @@ def handle_suspicious_question(question, flag):
         "user": st.session_state.user_id
     }
     st.session_state.suspicious_log.append(alert)
-    # Sauvegarder dans fichier
-    try:
-        alert_path = Path("memory") / "alerts.json"
-        alert_path.parent.mkdir(exist_ok=True)
-        existing = json.loads(alert_path.read_text()) if alert_path.exists() else []
-        existing.append(alert)
-        alert_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
-    except:
-        pass
+    # Garder max 50 alertes en mémoire
+    if len(st.session_state.suspicious_log) > 50:
+        st.session_state.suspicious_log = st.session_state.suspicious_log[-50:]
     return location
 
 
@@ -1071,23 +1065,12 @@ def handle_suspicious_question(question, flag):
 # 👥 MODULE 3 : PROFILS UTILISATEURS AVANCÉS (livre p.89)
 # ═══════════════════════════════════════════════════════════════
 def load_user_profiles():
-    """Charge les profils depuis fichier JSON"""
-    try:
-        p = Path("memory") / "profiles.json"
-        if p.exists():
-            return json.loads(p.read_text(encoding="utf-8"))
-    except:
-        pass
-    return {}
+    """Charge les profils depuis session_state (pas de fichier)"""
+    return st.session_state.get("user_profiles", {})
 
 def save_user_profiles(profiles):
-    """Sauvegarde les profils"""
-    try:
-        p = Path("memory") / "profiles.json"
-        p.parent.mkdir(exist_ok=True)
-        p.write_text(json.dumps(profiles, indent=2, ensure_ascii=False))
-    except:
-        pass
+    """Sauvegarde les profils en session_state (pas de fichier)"""
+    st.session_state.user_profiles = profiles
 
 def get_user_profile(user_id):
     """Retourne le profil d'un utilisateur ou un profil par défaut"""
@@ -1147,22 +1130,14 @@ LIBRARY_DEFAULT = {
 }
 
 def get_library():
-    """Charge la bibliothèque de textes"""
-    try:
-        p = Path("memory") / "library.json"
-        if p.exists():
-            return json.loads(p.read_text(encoding="utf-8"))
-    except:
-        pass
-    return LIBRARY_DEFAULT
+    """Charge la bibliothèque depuis session_state (pas de fichier)"""
+    if "library_data" not in st.session_state or not st.session_state.library_data:
+        st.session_state.library_data = json.loads(json.dumps(LIBRARY_DEFAULT))
+    return st.session_state.library_data
 
 def save_library(lib):
-    try:
-        p = Path("memory") / "library.json"
-        p.parent.mkdir(exist_ok=True)
-        p.write_text(json.dumps(lib, indent=2, ensure_ascii=False))
-    except:
-        pass
+    """Sauvegarde la bibliothèque en session_state (pas de fichier)"""
+    st.session_state.library_data = lib
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1236,7 +1211,7 @@ def show_admin_dashboard():
     if st.button("🗑️ Purger les alertes", type="secondary"):
         st.session_state.suspicious_log = []
         try:
-            (Path("memory") / "alerts.json").unlink(missing_ok=True)
+            pass  # pas de fichier à supprimer — stockage session_state
         except:
             pass
         st.success("Alertes purgées !")
@@ -1254,22 +1229,12 @@ def recite_text(text, titre="", langue="fr"):
     play_reihana_voice(full, lang=langue)
 
 def get_song_library():
-    """Retourne la bibliothèque de chansons personnalisées"""
-    try:
-        p = Path("memory") / "songs.json"
-        if p.exists():
-            return json.loads(p.read_text(encoding="utf-8"))
-    except:
-        pass
-    return []
+    """Retourne la bibliothèque de chansons depuis session_state"""
+    return st.session_state.get("library_songs", [])
 
 def save_song_library(songs):
-    try:
-        p = Path("memory") / "songs.json"
-        p.parent.mkdir(exist_ok=True)
-        p.write_text(json.dumps(songs, indent=2, ensure_ascii=False))
-    except:
-        pass
+    """Sauvegarde en session_state"""
+    st.session_state.library_songs = songs
 
 
 # ═══════════════════════════════════════════════════════════════
