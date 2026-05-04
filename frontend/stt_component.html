@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; overflow: hidden; font-family: 'Orbitron', monospace; }
+  #reiMicZone {
+    display: flex; align-items: center; gap: 12px; padding: 6px 4px;
+  }
+  #reiMicBtn {
+    width: 54px; height: 54px; border-radius: 50%;
+    border: 2px solid rgba(0,255,200,0.5);
+    background: rgba(0,20,40,0.9); color: #00ffcc;
+    font-size: 22px; cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 15px rgba(0,255,200,0.2); flex-shrink: 0;
+    outline: none;
+  }
+  #reiMicBtn:hover { background: rgba(0,255,200,0.1); box-shadow: 0 0 25px rgba(0,255,200,0.4); }
+  #reiMicBtn.listening {
+    border-color: #ff3333; color: #ff5555;
+    background: rgba(255,30,30,0.15);
+    animation: micPulse 1s ease-in-out infinite;
+  }
+  #reiMicBtn.processing { border-color: #ffaa00; color: #ffaa00; }
+  @keyframes micPulse {
+    0%,100% { box-shadow: 0 0 10px rgba(255,50,50,.4); }
+    50%      { box-shadow: 0 0 28px rgba(255,50,50,.8); }
+  }
+  #reiMicInfo { flex: 1; min-width: 0; }
+  #reiMicStatus {
+    font-size: 9px; letter-spacing: 2px;
+    color: rgba(0,255,200,0.5); margin-bottom: 3px;
+    font-family: 'Orbitron', monospace;
+  }
+  #reiMicStatus.active    { color: #ff4444; }
+  #reiMicStatus.processing{ color: #ffaa00; }
+  #reiMicStatus.success   { color: #00ff88; }
+  #reiMicStatus.err       { color: #ff8800; }
+  #reiTranscript {
+    font-size: 11px; color: rgba(200,240,255,0.7);
+    font-family: 'Rajdhani', sans-serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #reiVolBars {
+    display: flex; align-items: flex-end; gap: 2px;
+    height: 22px; opacity: 0; transition: opacity .3s; margin-top: 3px;
+  }
+  #reiVolBars.active { opacity: 1; }
+  .reiVb {
+    width: 3px;
+    background: linear-gradient(0deg, #00ffcc, #7700ff);
+    border-radius: 1.5px; min-height: 3px; transition: height .05s;
+  }
+  #reiTimer {
+    font-size: 8px; color: #ff5555; letter-spacing: 1px;
+    margin-top: 2px; display: none;
+    font-family: 'Orbitron', monospace;
+  }
+  #reiTimer.on { display: block; }
+  #reiInfo {
+    font-size: 8px; color: rgba(0,255,200,0.35);
+    margin-top: 2px; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div id="reiMicZone">
+  <button id="reiMicBtn" onclick="toggleMic()" title="Cliquer pour parler">🎙️</button>
+  <div id="reiMicInfo">
+    <div id="reiMicStatus">MICRO PRÊT</div>
+    <div id="reiTranscript">Cliquez sur 🎙️ pour parler...</div>
+    <div id="reiVolBars">
+      <div class="reiVb" style="height:4px"></div>
+      <div class="reiVb" style="height:8px"></div>
+      <div class="reiVb" style="height:14px"></div>
+      <div class="reiVb" style="height:18px"></div>
+      <div class="reiVb" style="height:22px"></div>
+      <div class="reiVb" style="height:18px"></div>
+      <div class="reiVb" style="height:14px"></div>
+      <div class="reiVb" style="height:8px"></div>
+      <div class="reiVb" style="height:4px"></div>
+    </div>
+    <div id="reiTimer">⏺ 0s / max 30s</div>
+    <div id="reiInfo" id="reiInfo">🎤 Whisper AI · Max 30s</div>
+  </div>
+</div>
+
+<script>
+var _mediaRecorder = null;
+var _audioChunks   = [];
+var _listening     = false;
+var _analyser      = null;
+var _animFrame     = null;
+var _stream        = null;
+var _timerInterval = null;
+var _seconds       = 0;
+var _sttLang       = "fr"; // sera mis à jour via onRender
+
+var _btn       = document.getElementById("reiMicBtn");
+var _status    = document.getElementById("reiMicStatus");
+var _transcript= document.getElementById("reiTranscript");
+var _volBars   = document.getElementById("reiVolBars");
+var _vbs       = document.querySelectorAll(".reiVb");
+var _timer     = document.getElementById("reiTimer");
+var _info      = document.getElementById("reiInfo");
+
+// ── Streamlit lifecycle ──────────────────────────────────────────────────────
+function onRender(event) {
+  var data = event.detail;
+  if (data && data.lang) {
+    _sttLang = data.lang; // "fr", "ar", "en"
+    _info.innerText = "🎤 Whisper AI · Langue: " + _sttLang.toUpperCase() + " · Max 30s";
+  }
+}
+Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+Streamlit.setComponentReady();
+Streamlit.setFrameHeight(90);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function setSt(cls, txt) {
+  _status.className = cls;
+  _status.innerText = txt;
+}
+
+function startVisualizer(stream) {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var src = ctx.createMediaStreamSource(stream);
+    _analyser = ctx.createAnalyser();
+    _analyser.fftSize = 256;
+    src.connect(_analyser);
+    var data = new Uint8Array(_analyser.frequencyBinCount);
+    _volBars.classList.add("active");
+    (function draw() {
+      if (!_listening) {
+        _volBars.classList.remove("active");
+        _vbs.forEach(function(b) { b.style.height = "3px"; });
+        return;
+      }
+      _animFrame = requestAnimationFrame(draw);
+      _analyser.getByteFrequencyData(data);
+      var bands = [2,4,6,10,14,18,14,10,6];
+      bands.forEach(function(band, i) {
+        var sum = 0;
+        for (var j = 0; j < band; j++)
+          sum += data[Math.floor(j * data.length / band / 9 + i * data.length / 9)];
+        _vbs[i].style.height = Math.max(3, Math.min(22, (sum / band) / 5)) + "px";
+      });
+    })();
+  } catch(e) {}
+}
+
+function startTimer() {
+  _seconds = 0;
+  _timer.classList.add("on");
+  _timerInterval = setInterval(function() {
+    _seconds++;
+    _timer.innerText = "⏺ " + _seconds + "s / max 30s";
+    if (_seconds >= 30) stopMic();
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(_timerInterval);
+  _timer.classList.remove("on");
+}
+
+// ── Micro ON/OFF ─────────────────────────────────────────────────────────────
+function toggleMic() {
+  if (_listening) stopMic();
+  else startMic();
+}
+
+function startMic() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setSt("err", "⚠️ Micro non supporté");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    .then(function(stream) {
+      _stream = stream;
+      _audioChunks = [];
+      _listening = true;
+
+      // Meilleur format selon navigateur
+      var mimeType = "audio/webm";
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus"))
+        mimeType = "audio/webm;codecs=opus";
+      else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus"))
+        mimeType = "audio/ogg;codecs=opus";  // Firefox
+      else if (MediaRecorder.isTypeSupported("audio/mp4"))
+        mimeType = "audio/mp4";
+
+      _mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+      _mediaRecorder.ondataavailable = function(e) {
+        if (e.data && e.data.size > 0) _audioChunks.push(e.data);
+      };
+      _mediaRecorder.onstop = function() {
+        transcribeAudio(_audioChunks, mimeType);
+      };
+      _mediaRecorder.start(200);
+
+      _btn.classList.add("listening");
+      _btn.innerText = "⏹";
+      setSt("active", "🔴 ENREGISTREMENT...");
+      _transcript.innerText = "Parlez maintenant...";
+      startVisualizer(stream);
+      startTimer();
+    })
+    .catch(function(err) {
+      setSt("err", "🚫 Micro refusé");
+      _transcript.innerText = "Autorisez le micro dans le navigateur";
+    });
+}
+
+function stopMic() {
+  _listening = false;
+  stopTimer();
+  cancelAnimationFrame(_animFrame);
+  if (_mediaRecorder && _mediaRecorder.state !== "inactive")
+    _mediaRecorder.stop();
+  if (_stream) {
+    _stream.getTracks().forEach(function(t) { t.stop(); });
+    _stream = null;
+  }
+  _btn.classList.remove("listening");
+  _btn.innerText = "🎙️";
+  setSt("processing", "⚙️ TRANSCRIPTION...");
+  _transcript.innerText = "Whisper AI analyse votre voix...";
+}
+
+// ── Envoi à Streamlit via setComponentValue ───────────────────────────────────
+function transcribeAudio(chunks, mimeType) {
+  if (!chunks || chunks.length === 0) {
+    setSt("err", "⚠️ Audio vide");
+    _transcript.innerText = "Aucun son capturé";
+    setSt("", "MICRO PRÊT");
+    return;
+  }
+
+  var blob = new Blob(chunks, { type: mimeType });
+  var ext = "webm";
+  if (mimeType.includes("ogg")) ext = "ogg";
+  else if (mimeType.includes("mp4")) ext = "mp4";
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var b64 = ev.target.result.split(",")[1];
+    // ✅ C'est ici que la valeur remonte à Python
+    Streamlit.setComponentValue({
+      b64:  b64,
+      mime: mimeType,
+      lang: _sttLang,
+      ts:   Date.now()
+    });
+    setSt("success", "✅ ENVOYÉ À WHISPER");
+    _transcript.innerText = "Traitement en cours...";
+  };
+  reader.onerror = function() {
+    setSt("err", "⚠️ Erreur lecture audio");
+    _transcript.innerText = "Réessayez";
+  };
+  reader.readAsDataURL(blob);
+}
+
+// Mise à jour langue depuis Python
+window.addEventListener("message", function(e) {
+  if (e.data && e.data.type === "reiSetSttLang") {
+    _sttLang = e.data.lang;
+    _info.innerText = "🎤 Whisper AI · Langue: " + _sttLang.toUpperCase() + " · Max 30s";
+  }
+});
+
+// Callback pour afficher le résultat final dans le transcript
+window._showResult = function(text) {
+  if (text) {
+    setSt("success", "✅ TRANSCRIT");
+    _transcript.innerText = "✓ " + text.substring(0, 60) + (text.length > 60 ? "…" : "");
+    setTimeout(function() {
+      setSt("", "MICRO PRÊT");
+      _transcript.innerText = "Cliquez sur 🎙️ pour reparler...";
+    }, 3000);
+  }
+};
+</script>
+</body>
+</html>

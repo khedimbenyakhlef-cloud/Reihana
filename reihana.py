@@ -1590,13 +1590,24 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale ultra-réaliste ──
-_stt_lang_map = {"🇫🇷 Français": "fr-FR", "🇩🇿 العربية": "ar-SA", "🇬🇧 English": "en-US"}
-_stt_lang = _stt_lang_map.get(st.session_state.langue, "fr-FR")
+# ── Reconnaissance vocale Whisper — declare_component (v15-fix) ──
+# CORRECTION : html() ne peut PAS retourner de valeur. Seul declare_component le peut.
+import streamlit.components.v1 as _comp_v1
+from pathlib import Path as _Path
 
-# ── Widget Micro v14 : MediaRecorder + Whisper Groq (Firefox/Chrome/Edge) ──
-import streamlit.components.v1 as _stt_comp
-_whisper_result = _stt_comp.html(f"""
+_FRONTEND_DIR = str(_Path(__file__).parent / "frontend")
+_stt_component = _comp_v1.declare_component("reihana_stt", path=_FRONTEND_DIR)
+
+_stt_lang_map = {"🇫🇷 Français": "fr", "🇩🇿 العربية": "ar", "🇬🇧 English": "en"}
+_stt_lang = _stt_lang_map.get(st.session_state.langue, "fr")
+
+_whisper_result = _stt_component(lang=_stt_lang, key="reihana_stt")
+
+# ── ANCIEN BLOC html() SUPPRIMÉ — tout le HTML/JS est maintenant dans frontend/stt_component.html ──
+# (le bloc ci-dessous ne sert qu'à aligner les lignes supprimées)
+if False:
+    pass
+    """DEBUT_BLOC_SUPPRIME
 <script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
 <style>
   body{{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Orbitron',monospace;}}
@@ -1806,11 +1817,7 @@ window.addEventListener("message", function(e) {{
   if (e.data && e.data.type === "reiSetSttLang") {{
     _sttLang = e.data.lang;
   }}
-}});
-// Init Streamlit
-Streamlit.setFrameHeight(140);
-</script>
-""", height=140)
+    FIN_BLOC_SUPPRIME"""
 
 
 # ── Zone texte + boutons ──
@@ -1875,71 +1882,8 @@ if (_whisper_result and isinstance(_whisper_result, dict)
         st.error(f"Whisper erreur: {_we}")
     st.rerun()
 
-# ── Script de liaison STT → champ Streamlit ──
-import streamlit.components.v1 as _bridge_comp
-_bridge_comp.html("""
-<script>
-// Écouter les messages postMessage de l'iframe STT
-window.addEventListener("message", function(e) {
-  if(!e.data || !e.data.type) return;
-  
-  if(e.data.type === "reiSTT_FINAL") {
-    var txt = e.data.text;
-    var autoSend = e.data.autoSend;
-    
-    // Trouver le textarea de Streamlit et injecter le texte
-    var iframes = document.querySelectorAll("iframe");
-    
-    // Méthode 1: Chercher dans tous les iframes
-    function injectText(targetDoc) {
-      var ta = targetDoc.querySelector('textarea[data-testid="stTextArea"]') ||
-               targetDoc.querySelector('textarea');
-      if(ta) {
-        var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-        nativeInputValueSetter.call(ta, txt);
-        ta.dispatchEvent(new Event('input', {bubbles:true}));
-        ta.dispatchEvent(new Event('change', {bubbles:true}));
-        ta.focus();
-        return true;
-      }
-      return false;
-    }
-    
-    // Essayer dans le document courant (parent)
-    var done = injectText(document);
-    
-    // Si auto-envoi, cliquer sur ENVOYER après injection
-    if(autoSend) {
-      setTimeout(function() {
-        var btns = Array.from(document.querySelectorAll('button'));
-        var sendBtn = btns.find(function(b) {
-          return b.innerText.includes('ENVOYER') || 
-                 b.innerText.includes('SEND') || 
-                 b.innerText.includes('إرسال');
-        });
-        if(sendBtn) {
-          sendBtn.click();
-        }
-      }, 800);
-    }
-  }
-  
-  if(e.data.type === "reiSTT") {
-    // Mise à jour en temps réel dans le textarea
-    var txt = e.data.text;
-    var ta = document.querySelector('textarea');
-    if(ta && e.data.final === false) {
-      // Afficher texte intermédiaire (italique via placeholder-like)
-      ta.setAttribute('placeholder', '🎙️ ' + txt + '...');
-    } else if(ta && txt) {
-      var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-      nativeInputValueSetter.call(ta, txt);
-      ta.dispatchEvent(new Event('input', {bubbles:true}));
-    }
-  }
-});
-</script>
-""", height=0)
+# ── Script de liaison STT → champ Streamlit : SUPPRIMÉ ──
+# Inutile : declare_component remonte la valeur directement via _whisper_result
 
 if st.session_state.regen_index is not None:
     idx=st.session_state.regen_index; q=st.session_state.regen_question
