@@ -1590,65 +1590,57 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale Whisper — html() + query_params (Render compatible) ──
+# ── Reconnaissance vocale Whisper — declare_component + Groq Python (Render compatible) ──
 import streamlit.components.v1 as _comp_v1
+from pathlib import Path as _Path
 
 _stt_lang_map = {"🇫🇷 Français": "fr", "🇩🇿 العربية": "ar", "🇬🇧 English": "en"}
 _stt_lang = _stt_lang_map.get(st.session_state.langue, "fr")
 
-# Récupérer transcription depuis query_params si disponible
-_stt_from_params = st.query_params.get("stt_text", "")
-if _stt_from_params:
-    st.session_state.input_value = _stt_from_params
-    st.query_params.clear()
-    st.rerun()
+# ── Créer le fichier frontend/stt_component.html à la volée si besoin ──
+_frontend_dir = _Path(__file__).parent / "frontend"
+_frontend_dir.mkdir(exist_ok=True)
+_stt_html_path = _frontend_dir / "stt_component.html"
 
-_whisper_result = None  # plus utilisé via declare_component
-
-# Clé Groq pour Whisper
-try:
-    _groq_key_stt = st.secrets["GROQ_API_KEY"]
-except:
-    _groq_key_stt = os.environ.get("GROQ_API_KEY", "")
-
-_stt_html = f"""
+_stt_html_content = """<!DOCTYPE html>
 <html>
 <head>
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
 <style>
-  body{{margin:0;padding:0;background:transparent;font-family:'Orbitron',monospace;overflow:hidden;}}
-  #zone{{display:flex;align-items:center;gap:10px;padding:4px 0;}}
-  #micBtn{{
+  body{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}
+  #zone{display:flex;align-items:center;gap:10px;padding:4px 0;}
+  #micBtn{
     width:52px;height:52px;border-radius:50%;border:2px solid rgba(0,255,200,0.5);
     background:rgba(0,20,40,0.9);color:#00ffcc;font-size:22px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 15px rgba(0,255,200,0.2);transition:all .2s;flex-shrink:0;
-  }}
-  #micBtn:hover{{background:rgba(0,255,200,0.1);box-shadow:0 0 25px rgba(0,255,200,0.4);}}
-  #micBtn.listening{{border-color:#ff3333;color:#ff5555;background:rgba(255,30,30,0.15);
-    animation:micPulse 1s ease-in-out infinite;}}
-  #micBtn.processing{{border-color:#ffaa00;color:#ffaa00;}}
-  @keyframes micPulse{{0%,100%{{box-shadow:0 0 10px rgba(255,50,50,.4);}}50%{{box-shadow:0 0 28px rgba(255,50,50,.8);}}}}
-  #info{{flex:1;}}
-  #status{{font-size:9px;letter-spacing:2px;color:rgba(0,255,200,0.5);margin-bottom:3px;}}
-  #status.active{{color:#ff4444;}}
-  #status.processing{{color:#ffaa00;}}
-  #status.success{{color:#00ff88;}}
-  #status.err{{color:#ff8800;}}
-  #transcript{{font-size:11px;color:rgba(200,240,255,0.6);font-family:'Rajdhani',sans-serif;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}}
-  #bars{{display:flex;align-items:flex-end;gap:2px;height:22px;opacity:0;transition:opacity .3s;margin-top:3px;}}
-  #bars.active{{opacity:1;}}
-  .vb{{width:3px;background:linear-gradient(0deg,#00ffcc,#7700ff);border-radius:1.5px;min-height:3px;transition:height .05s;}}
-  #timer{{font-size:8px;color:#ff5555;letter-spacing:1px;margin-top:2px;display:none;}}
-  #timer.on{{display:block;}}
+  }
+  #micBtn:hover{background:rgba(0,255,200,0.1);box-shadow:0 0 25px rgba(0,255,200,0.4);}
+  #micBtn.listening{border-color:#ff3333;color:#ff5555;background:rgba(255,30,30,0.15);
+    animation:micPulse 1s ease-in-out infinite;}
+  #micBtn.processing{border-color:#ffaa00;color:#ffaa00;}
+  @keyframes micPulse{0%,100%{box-shadow:0 0 10px rgba(255,50,50,.4);}50%{box-shadow:0 0 28px rgba(255,50,50,.8);}}
+  #info{flex:1;}
+  #status{font-size:9px;letter-spacing:2px;color:rgba(0,255,200,0.5);margin-bottom:3px;}
+  #status.active{color:#ff4444;}
+  #status.processing{color:#ffaa00;}
+  #status.success{color:#00ff88;}
+  #status.err{color:#ff8800;}
+  #trans{font-size:11px;color:rgba(200,240,255,0.6);font-family:Rajdhani,sans-serif;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+  #bars{display:flex;align-items:flex-end;gap:2px;height:22px;opacity:0;transition:opacity .3s;margin-top:3px;}
+  #bars.active{opacity:1;}
+  .vb{width:3px;background:linear-gradient(0deg,#00ffcc,#7700ff);border-radius:1.5px;min-height:3px;transition:height .05s;}
+  #timer{font-size:8px;color:#ff5555;letter-spacing:1px;margin-top:2px;display:none;}
+  #timer.on{display:block;}
 </style>
 </head>
 <body>
 <div id="zone">
-  <button id="micBtn" onclick="toggleMic()" title="Cliquer pour parler">🎙️</button>
+  <button id="micBtn" onclick="toggleMic()" title="Parler">🎙️</button>
   <div id="info">
     <div id="status">MICRO PRÊT</div>
-    <div id="transcript">Cliquez sur 🎙️ pour parler...</div>
+    <div id="trans">Cliquez sur 🎙️ pour parler...</div>
     <div id="bars">
       <div class="vb" style="height:4px"></div><div class="vb" style="height:8px"></div>
       <div class="vb" style="height:14px"></div><div class="vb" style="height:18px"></div>
@@ -1662,118 +1654,120 @@ _stt_html = f"""
 <script>
 var _rec=null,_chunks=[],_listening=false,_analyser=null,_frame=null,_stream=null;
 var _timerInt=null,_sec=0;
-var _groqKey="{_groq_key_stt}";
-var _lang="{_stt_lang}";
+var _lang="fr";
 var btn=document.getElementById("micBtn");
 var stat=document.getElementById("status");
-var trans=document.getElementById("transcript");
+var trans=document.getElementById("trans");
 var bars=document.getElementById("bars");
 var vbs=document.querySelectorAll(".vb");
 var timer=document.getElementById("timer");
 
-function setSt(cls,txt){{stat.className=cls;stat.innerText=txt;}}
+// Recevoir les paramètres de Streamlit
+function onRender(event){
+  if(!event.data.args) return;
+  if(event.data.args.lang) _lang=event.data.args.lang;
+}
+Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+Streamlit.setComponentReady();
+Streamlit.setFrameHeight(70);
 
-function startViz(stream){{
-  try{{
+function setSt(cls,txt){stat.className=cls;stat.innerText=txt;}
+
+function startViz(stream){
+  try{
     var ctx=new(window.AudioContext||window.webkitAudioContext)();
     var src=ctx.createMediaStreamSource(stream);
     _analyser=ctx.createAnalyser();_analyser.fftSize=256;src.connect(_analyser);
     var data=new Uint8Array(_analyser.frequencyBinCount);
     bars.classList.add("active");
-    (function draw(){{
-      if(!_listening){{bars.classList.remove("active");vbs.forEach(function(b){{b.style.height="3px";}});return;}}
+    (function draw(){
+      if(!_listening){bars.classList.remove("active");vbs.forEach(function(b){b.style.height="3px";});return;}
       _frame=requestAnimationFrame(draw);_analyser.getByteFrequencyData(data);
       var bds=[2,4,6,10,14,18,14,10,6];
-      bds.forEach(function(b,i){{
+      bds.forEach(function(b,i){
         var s=0;for(var j=0;j<b;j++)s+=data[Math.floor(j*data.length/b/9+i*data.length/9)];
         vbs[i].style.height=Math.max(3,Math.min(22,(s/b)/5))+"px";
-      }});
-    }})();
-  }}catch(e){{}}
-}}
+      });
+    })();
+  }catch(e){}
+}
 
-function startTimer(){{
+function startTimer(){
   _sec=0;timer.classList.add("on");
-  _timerInt=setInterval(function(){{
+  _timerInt=setInterval(function(){
     _sec++;timer.innerText="⏺ "+_sec+"s / max 30s";
-    if(_sec>=30)stopMic();
-  }},1000);
-}}
-function stopTimer(){{clearInterval(_timerInt);timer.classList.remove("on");}}
+    if(_sec>=30) stopMic();
+  },1000);
+}
+function stopTimer(){clearInterval(_timerInt);timer.classList.remove("on");}
+function toggleMic(){if(_listening) stopMic();else startMic();}
 
-function toggleMic(){{if(_listening)stopMic();else startMic();}}
-
-function startMic(){{
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){{
+function startMic(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     setSt("err","⚠️ Micro non supporté");return;
-  }}
-  navigator.mediaDevices.getUserMedia({{audio:true,video:false}})
-    .then(function(stream){{
+  }
+  navigator.mediaDevices.getUserMedia({audio:true,video:false})
+    .then(function(stream){
       _stream=stream;_chunks=[];_listening=true;
       var mime="audio/webm";
-      if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus"))mime="audio/webm;codecs=opus";
-      else if(MediaRecorder.isTypeSupported("audio/ogg;codecs=opus"))mime="audio/ogg;codecs=opus";
-      else if(MediaRecorder.isTypeSupported("audio/mp4"))mime="audio/mp4";
-      _rec=new MediaRecorder(stream,{{mimeType:mime}});
-      _rec.ondataavailable=function(e){{if(e.data&&e.data.size>0)_chunks.push(e.data);}};
-      _rec.onstop=function(){{transcribe(_chunks,mime);}};
+      if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) mime="audio/webm;codecs=opus";
+      else if(MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) mime="audio/ogg;codecs=opus";
+      else if(MediaRecorder.isTypeSupported("audio/mp4")) mime="audio/mp4";
+      _rec=new MediaRecorder(stream,{mimeType:mime});
+      _rec.ondataavailable=function(e){if(e.data&&e.data.size>0) _chunks.push(e.data);};
+      _rec.onstop=function(){sendAudio(_chunks,mime);};
       _rec.start(200);
       btn.className="listening";btn.innerText="⏹";
       setSt("active","🔴 ENREGISTREMENT...");
       trans.innerText="Parlez maintenant...";
       startViz(stream);startTimer();
-    }})
-    .catch(function(err){{setSt("err","🚫 Micro refusé: "+err.message);}});
-}}
+    })
+    .catch(function(err){setSt("err","🚫 Micro refusé: "+err.message);});
+}
 
-function stopMic(){{
+function stopMic(){
   _listening=false;stopTimer();cancelAnimationFrame(_frame);
-  if(_rec&&_rec.state!=="inactive")_rec.stop();
-  if(_stream){{_stream.getTracks().forEach(function(t){{t.stop();}});_stream=null;}}
+  if(_rec&&_rec.state!=="inactive") _rec.stop();
+  if(_stream){_stream.getTracks().forEach(function(t){t.stop();});_stream=null;}
   btn.className="processing";btn.innerText="🎙️";
-  setSt("processing","⚙️ TRANSCRIPTION...");
-  trans.innerText="Whisper AI analyse votre voix...";
-}}
+  setSt("processing","⚙️ Envoi au serveur...");
+  trans.innerText="Python analyse votre voix...";
+}
 
-function transcribe(chunks,mime){{
-  if(!chunks||chunks.length===0){{setSt("err","⚠️ Audio vide");trans.innerText="Aucun son capturé";return;}}
-  var blob=new Blob(chunks,{{type:mime}});
+function sendAudio(chunks,mime){
+  if(!chunks||chunks.length===0){setSt("err","⚠️ Audio vide");trans.innerText="Réessayez...";btn.className="";return;}
+  var blob=new Blob(chunks,{type:mime});
   var ext="webm";
-  if(mime.includes("ogg"))ext="ogg";else if(mime.includes("mp4"))ext="mp4";
-  var form=new FormData();
-  form.append("file",blob,"voice."+ext);
-  form.append("model","whisper-large-v3");
-  form.append("language",_lang);
-  form.append("response_format","text");
-  fetch("https://api.groq.com/openai/v1/audio/transcriptions",{{
-    method:"POST",
-    headers:{{"Authorization":"Bearer "+_groqKey}},
-    body:form
-  }})
-  .then(function(r){{return r.text();}})
-  .then(function(txt){{
-    txt=(txt||"").trim();
-    if(!txt){{setSt("err","⚠️ Rien capturé");trans.innerText="Réessayez...";btn.innerText="🎙️";btn.className="";return;}}
-    setSt("success","✅ TRANSCRIT !");
-    trans.innerText=txt;
-    btn.innerText="🎙️";btn.className="";
-    // Envoyer le texte à Streamlit via query_params
-    try{{
-      var url=new URL(window.parent.location.href);
-      url.searchParams.set("stt_text",txt);
-      window.parent.location.href=url.toString();
-    }}catch(e){{
-      // Fallback si iframe cross-origin
-      window.top.location.href=window.top.location.href.split("?")[0]+"?stt_text="+encodeURIComponent(txt);
-    }}
-  }})
-  .catch(function(e){{setSt("err","❌ "+e.message);btn.innerText="🎙️";btn.className="";}});
-}}
+  if(mime.includes("ogg")) ext="ogg";
+  else if(mime.includes("mp4")) ext="mp4";
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var b64=ev.target.result.split(",")[1];
+    setSt("success","✅ Audio envoyé !");
+    trans.innerText="Whisper transcrit...";
+    btn.className="";
+    // Envoyer à Python via setComponentValue
+    Streamlit.setComponentValue({b64:b64,mime:mime,lang:_lang,ts:Date.now()});
+  };
+  reader.readAsDataURL(blob);
+}
 </script>
 </body>
-</html>
-"""
-_comp_v1.html(_stt_html, height=70)
+</html>"""
+
+# Écrire le fichier HTML seulement s'il a changé
+_write_html = True
+if _stt_html_path.exists():
+    try:
+        if _stt_html_path.read_text(encoding="utf-8").strip() == _stt_html_content.strip():
+            _write_html = False
+    except:
+        pass
+if _write_html:
+    _stt_html_path.write_text(_stt_html_content, encoding="utf-8")
+
+_stt_component = _comp_v1.declare_component("reihana_stt", path=str(_frontend_dir))
+_whisper_result = _stt_component(lang=_stt_lang, key="reihana_stt_v2")
 
 # ── Bloc mort (gardé pour éviter erreurs de syntaxe) ──
 if False:
