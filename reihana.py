@@ -1597,6 +1597,7 @@ _stt_lang = _stt_lang_map.get(st.session_state.langue, "fr-FR")
 # ── Widget Micro v14 : MediaRecorder + Whisper Groq (Firefox/Chrome/Edge) ──
 import streamlit.components.v1 as _stt_comp
 _whisper_result = _stt_comp.html(f"""
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
 <style>
   body{{margin:0;padding:0;background:transparent;overflow:hidden;font-family:'Orbitron',monospace;}}
   #reiMicZone{{display:flex;align-items:center;gap:12px;padding:6px 0;}}
@@ -1792,42 +1793,11 @@ function transcribeAudio(chunks, mimeType) {{
   formData.append("audio", blob, "voice." + ext);
   formData.append("lang", _sttLang.split("-")[0]); // "fr", "ar", "en"
 
-  // Appel API Streamlit via fetch vers l'endpoint /transcribe
-  // Convertir en base64 et envoyer au parent Streamlit
+  // Envoyer audio via Streamlit.setComponentValue (officiel)
   var reader = new FileReader();
   reader.onload = function(ev) {{
     var b64 = ev.target.result.split(",")[1];
-    var audioMime = mimeType;
-    // Envoyer au bridge Streamlit
-    window.parent.postMessage({{
-      type: "reiAUDIO",
-      b64: b64,
-      mime: audioMime,
-      lang: _sttLang.split("-")[0]
-    }}, "*");
-    // Attendre la réponse du bridge
-    window.addEventListener("message", function handler(ev2) {{
-      if (ev2.data && ev2.data.type === "reiWHISPER_RESULT") {{
-        window.removeEventListener("message", handler);
-        var txt = ev2.data.text;
-        if (txt && txt.trim()) {{
-          _transcript.innerText = "✅ " + txt.substring(0,50) + (txt.length>50?"...":"");
-          setSt("success", "✅ TRANSCRIT!");
-          window.parent.postMessage({{type:"reiSTT_FINAL", text:txt.trim(), autoSend:false}}, "*");
-          setTimeout(function(){{
-            setSt("","MICRO PRÊT");
-            _transcript.innerText = "Cliquez sur 🎙️ pour parler...";
-          }}, 3000);
-        }} else {{
-          setSt("err","💬 Rien compris");
-          _transcript.innerText = "Réessayez en parlant plus fort";
-          setTimeout(function(){{
-            setSt("","MICRO PRÊT");
-            _transcript.innerText = "Cliquez sur 🎙️ pour parler...";
-          }}, 2500);
-        }}
-      }}
-    }});
+    Streamlit.setComponentValue({{b64:b64, mime:mimeType, lang:_sttLang.split("-")[0], ts:Date.now()}});
   }};
   reader.readAsDataURL(blob);
 }}
@@ -1837,6 +1807,8 @@ window.addEventListener("message", function(e) {{
     _sttLang = e.data.lang;
   }}
 }});
+// Init Streamlit
+Streamlit.setFrameHeight(140);
 </script>
 """, height=140)
 
@@ -1846,6 +1818,9 @@ ci, cs2, cs3 = st.columns([5, 1, 1])
 with ci:
     if st.session_state.clear_input:
         st.session_state.input_value=""; st.session_state.clear_input=False; st.rerun()
+    # Afficher notification si Whisper vient de transcrire
+    if st.session_state.get("whisper_ready"):
+        st.session_state.whisper_ready = False
     user_input=st.text_area("",value=st.session_state.input_value,placeholder=T["placeholder"],key="uinput",height=80,label_visibility="collapsed")
     st.session_state.input_value=user_input
 with cs2:
@@ -1857,63 +1832,48 @@ with cs3:
     if st.button("🔇", use_container_width=True, key="micstop", help="Arrêter le micro"):
         pass
 
-# ── Réception audio + Whisper Groq (v14) ──
-import streamlit.components.v1 as _whisper_bridge
-_audio_data = _whisper_bridge.html("""
-<script>
-window.addEventListener("message", function(e) {
-  if (e.data && e.data.type === "reiAUDIO") {
-    // Relayer au composant Streamlit
-    if (window.Streamlit) {
-      window.Streamlit.setComponentValue({b64: e.data.b64, mime: e.data.mime, lang: e.data.lang});
-    }
-  }
-});
-if (window.Streamlit) window.Streamlit.setFrameHeight(0);
-</script>
-""", height=0)
-
-# Traiter l'audio avec Whisper Groq si reçu
-if _audio_data and isinstance(_audio_data, dict) and _audio_data.get("b64"):
+# ── Réception audio + Whisper Groq v15 (via query_params) ──
+# Lire d'abord si un audio base64 est dans query_params
+# Traiter l'audio si _whisper_result reçu via setComponentValue
+if (_whisper_result and isinstance(_whisper_result, dict)
+        and _whisper_result.get("b64")
+        and _whisper_result.get("ts",0) != st.session_state.get("last_audio_ts",0)):
+    st.session_state.last_audio_ts = _whisper_result["ts"]
+    _w_b64  = _whisper_result["b64"]
+    _w_mime = _whisper_result.get("mime","audio/ogg")
+    _w_lang = _whisper_result.get("lang","fr")
     try:
-        import io, base64
+        import base64
         from groq import Groq as _GroqClient
-        # Récupérer la clé Groq (secrets Streamlit ou variable env Render)
         try:
             _groq_key = st.secrets["GROQ_API_KEY"]
         except:
-            _groq_key = os.environ.get("GROQ_API_KEY", "")
-        # Fallback: extraire depuis l'engine existant
+            _groq_key = os.environ.get("GROQ_API_KEY","")
         if not _groq_key:
             _eng = st.session_state.get("engine")
-            _groq_key = getattr(_eng, "api_key", "") or getattr(_eng, "groq_api_key", "")
+            _groq_key = getattr(_eng,"api_key","") or getattr(_eng,"groq_api_key","")
         _gc = _GroqClient(api_key=_groq_key)
-        _audio_bytes = base64.b64decode(_audio_data["b64"])
-        _audio_lang = _audio_data.get("lang","fr")
-        _audio_mime = _audio_data.get("mime","audio/webm")
-        _ext = "ogg" if "ogg" in _audio_mime else ("mp4" if "mp4" in _audio_mime else "webm")
+        _audio_bytes = base64.b64decode(_w_b64)
+        _ext = "ogg" if "ogg" in _w_mime else ("mp4" if "mp4" in _w_mime else "webm")
         with tempfile.NamedTemporaryFile(suffix="."+_ext, delete=False) as _tf:
             _tf.write(_audio_bytes)
             _tf_path = _tf.name
-        with open(_tf_path, "rb") as _af:
+        with open(_tf_path,"rb") as _af:
             _whisper_resp = _gc.audio.transcriptions.create(
-                file=(_af.name, _af, _audio_mime),
+                file=(_af.name, _af, _w_mime),
                 model="whisper-large-v3",
-                language=_audio_lang,
+                language=_w_lang,
                 response_format="text"
             )
         os.unlink(_tf_path)
         _transcribed = str(_whisper_resp).strip() if _whisper_resp else ""
-        # Renvoyer le texte au widget JS via un composant HTML
         if _transcribed:
-            import streamlit.components.v1 as _result_comp
-            _result_comp.html(f"""
-<script>
-window.parent.postMessage({{type:"reiWHISPER_RESULT", text:{repr(_transcribed)}}}, "*");
-</script>
-""", height=0)
+            st.session_state.input_value = _transcribed
+            st.session_state.whisper_ready = True
     except Exception as _we:
-        st.error(f"Whisper: {_we}")
+        st.session_state.whisper_ready = False
+        st.error(f"Whisper erreur: {_we}")
+    st.rerun()
 
 # ── Script de liaison STT → champ Streamlit ──
 import streamlit.components.v1 as _bridge_comp
