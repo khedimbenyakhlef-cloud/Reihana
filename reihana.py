@@ -1590,7 +1590,7 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale — Web Speech API native (Render compatible, aucune clé) ──
+# ── Reconnaissance vocale — Web Speech API avec allow="microphone" ──
 import streamlit.components.v1 as _comp_v1
 
 _stt_lang_map = {"🇫🇷 Français": "fr-FR", "🇩🇿 العربية": "ar-SA", "🇬🇧 English": "en-US"}
@@ -1606,6 +1606,9 @@ if _stt_txt_in and _stt_txt_in.strip():
 
 _whisper_result = None
 
+# ── Widget micro avec allow="microphone" injecté via JS ──
+# L'erreur "network" sur Edge = iframe sans permission micro
+# Solution : injecter allow="microphone" sur l'iframe Streamlit parent via JS
 _stt_html = f"""<html><head>
 <style>
   body{{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}}
@@ -1653,6 +1656,22 @@ var vbs = document.querySelectorAll(".vb");
 var _recog = null;
 var _listening = false;
 var _animInt = null;
+var _retries = 0;
+
+// ── Injecter allow="microphone" sur TOUTES les iframes Streamlit du parent ──
+(function patchIframes() {{
+  try {{
+    var iframes = window.parent.document.querySelectorAll("iframe");
+    iframes.forEach(function(fr) {{
+      var allow = fr.getAttribute("allow") || "";
+      if(!allow.includes("microphone")) {{
+        fr.setAttribute("allow", allow ? allow + "; microphone" : "microphone");
+      }}
+    }});
+  }} catch(e) {{}}
+  // Re-patcher après 2s (nouvelles iframes ajoutées par Streamlit)
+  setTimeout(patchIframes, 2000);
+}})();
 
 function setSt(cls, txt) {{ stat.className = cls; stat.innerText = txt; }}
 
@@ -1671,9 +1690,7 @@ function animBars(on) {{
 }}
 
 function sendText(txt) {{
-  // Envoyer le texte transcrit à Streamlit via navigation URL
   var base = window.location.href.split("?")[0];
-  // Essayer window.parent en premier
   try {{
     window.parent.location.href = base + "?stt_text=" + encodeURIComponent(txt);
   }} catch(e) {{
@@ -1689,10 +1706,28 @@ function toggleMic() {{
 function startRecog() {{
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR) {{
-    setSt("err", "⚠️ Non supporté (Chrome requis)");
-    trans.innerText = "Utilisez Chrome ou Edge";
+    setSt("err", "⚠️ Chrome/Edge requis");
+    trans.innerText = "Firefox ne supporte pas";
     return;
   }}
+  
+  // Demander permission micro explicitement d'abord
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {{
+    navigator.mediaDevices.getUserMedia({{audio: true}})
+      .then(function(stream) {{
+        stream.getTracks().forEach(function(t) {{ t.stop(); }}); // libérer le stream
+        launchRecognition(SR);
+      }})
+      .catch(function(err) {{
+        setSt("err", "🚫 Micro refusé");
+        trans.innerText = "Autoriser le micro dans Edge";
+      }});
+  }} else {{
+    launchRecognition(SR);
+  }}
+}}
+
+function launchRecognition(SR) {{
   _recog = new SR();
   _recog.lang = _lang;
   _recog.continuous = false;
@@ -1701,6 +1736,7 @@ function startRecog() {{
   
   _recog.onstart = function() {{
     _listening = true;
+    _retries = 0;
     btn.className = "listening";
     btn.innerText = "⏹";
     setSt("active", "🔴 ÉCOUTE...");
@@ -1717,22 +1753,33 @@ function startRecog() {{
     }}
     trans.innerText = final_txt || interim || "...";
     if(final_txt) {{
-      setSt("success", "✅ TRANSCRIT !");
+      setSt("success", "✅ " + final_txt.trim().substring(0,30));
       animBars(false);
       btn.className = "";
       btn.innerText = "🎙️";
       _listening = false;
-      setTimeout(function() {{ sendText(final_txt.trim()); }}, 400);
+      setTimeout(function() {{ sendText(final_txt.trim()); }}, 500);
     }}
   }};
   
   _recog.onerror = function(e) {{
-    setSt("err", "❌ " + e.error);
-    trans.innerText = e.error === "not-allowed" ? "Autoriser le micro" : "Réessayez";
     animBars(false);
     btn.className = "";
     btn.innerText = "🎙️";
     _listening = false;
+    if(e.error === "network" && _retries < 2) {{
+      // Retry automatique après erreur network
+      _retries++;
+      setSt("err", "↺ Retry " + _retries + "/2...");
+      trans.innerText = "Reconnexion...";
+      setTimeout(function() {{ startRecog(); }}, 1500);
+    }} else if(e.error === "not-allowed") {{
+      setSt("err", "🚫 Micro bloqué");
+      trans.innerText = "Cliquez sur 🔒 dans la barre Edge";
+    }} else {{
+      setSt("err", "❌ " + e.error);
+      trans.innerText = "Réessayez ou utilisez le clavier";
+    }}
   }};
   
   _recog.onend = function() {{
@@ -1744,7 +1791,7 @@ function startRecog() {{
     }}
   }};
   
-  try {{ _recog.start(); }} catch(e) {{ setSt("err", "❌ " + e.message); }}
+  try {{ _recog.start(); }} catch(ex) {{ setSt("err", "❌ " + ex.message); }}
 }}
 
 function stopRecog() {{
