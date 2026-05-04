@@ -1595,6 +1595,19 @@ st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 _stt_lang_map = {"🇫🇷 Français":"fr-FR","🇩🇿 العربية":"ar-SA","🇬🇧 English":"en-US"}
 _stt_lang = _stt_lang_map.get(st.session_state.langue,"fr-FR")
 
+# ── Listener postMessage v11 : reçoit le message depuis l'iframe widget ──
+import streamlit.components.v1 as _cmp_pm
+_cmp_pm.html("""
+<script>
+window.addEventListener("message", function(e){
+  if(e.data && e.data.type === "reihana_send"){
+    var url = window.location.pathname + "?vt=" + encodeURIComponent(e.data.text) + "&vs=1";
+    window.location.href = url;
+  }
+});
+</script>
+""", height=0)
+
 # ── Lire texte + commande envoi depuis query params ──
 _qp = st.query_params
 _vt = _qp.get("vt","").strip()
@@ -1812,8 +1825,8 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
     if(!t)return;
     if(on)stopRec();
     setSt("ok","📨 Envoi en cours...");
-    window.parent.location.href=window.parent.location.pathname
-      +"?vt="+encodeURIComponent(t)+"&vs=1";
+    // v11 : postMessage évite le blocage cross-origin de window.parent.location
+    window.parent.postMessage({{type:"reihana_send",text:t}},"*");
   }}
 
   bMic.onclick=startRec;
