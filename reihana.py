@@ -714,6 +714,21 @@ defs = {
     "total_tokens":0,"session_start":datetime.now().strftime("%H:%M"),
     "last_song":{"verses":[],"mood":"calm","lang":"fr","msg_index":-1},
     "voice_input": "",
+    # ── NOUVEAU : fonctionnalités du livre ──
+    "face_profiles": {},          # {user_id: encodage_visage_base64}
+    "face_access_log": [],        # log des accès caméra
+    "geo_alerts": [],             # historique alertes géolocalisation
+    "conv_encrypted": True,       # chiffrement AES activé
+    "aes_key": None,              # clé Fernet
+    "library_poems": [],          # bibliothèque poèmes/textes
+    "library_songs": [],          # bibliothèque chansons personnalisées
+    "admin_dashboard_open": False,
+    "suspicious_log": [],         # log questions suspectes
+    "face_cam_active": False,     # caméra reconnaisance faciale active
+    "gesture_cam_active": False,  # caméra gestes active
+    "user_profiles": {},          # profils utilisateurs multi-personnes
+    "current_profile": "default", # profil actif
+    "wake_word": "reihana",       # mot d'activation
 }
 for k,v in defs.items():
     if k not in st.session_state: st.session_state[k]=v
@@ -942,6 +957,542 @@ if({str(st.session_state.music_on).lower()}){{reiAudio.play().catch(e=>console.l
 else{{reiAudio.pause();}}
 </script>""", unsafe_allow_html=True)
 
+# ═══════════════════════════════════════════════════════════════
+# 📚 MODULE 1 : CHIFFREMENT AES DES CONVERSATIONS (livre p.45)
+# ═══════════════════════════════════════════════════════════════
+def get_fernet():
+    """Retourne la clé Fernet (AES), la crée si inexistante"""
+    try:
+        from cryptography.fernet import Fernet
+        if not st.session_state.aes_key:
+            st.session_state.aes_key = Fernet.generate_key()
+        return Fernet(st.session_state.aes_key)
+    except:
+        return None
+
+def encrypt_conversation(question, reponse):
+    """Chiffre une conversation et la sauvegarde"""
+    try:
+        f = get_fernet()
+        if not f:
+            return
+        data = json.dumps({
+            "q": question, "r": reponse,
+            "ts": datetime.now().isoformat(),
+            "user": st.session_state.user_id
+        })
+        encrypted = f.encrypt(data.encode()).decode()
+        log_path = Path("memory") / "conversations.enc"
+        log_path.parent.mkdir(exist_ok=True)
+        with open(log_path, "a") as fp:
+            fp.write(encrypted + "\n")
+    except:
+        pass
+
+def decrypt_conversations():
+    """Déchiffre et retourne les conversations stockées"""
+    try:
+        f = get_fernet()
+        if not f:
+            return []
+        log_path = Path("memory") / "conversations.enc"
+        if not log_path.exists():
+            return []
+        results = []
+        for line in log_path.read_text().strip().split("\n"):
+            if line.strip():
+                try:
+                    decrypted = json.loads(f.decrypt(line.encode()).decode())
+                    results.append(decrypted)
+                except:
+                    pass
+        return results
+    except:
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🔍 MODULE 2 : DÉTECTION QUESTIONS SUSPECTES + GÉOLOCALISATION
+# ═══════════════════════════════════════════════════════════════
+RED_FLAGS = [
+    "adresse", "où habites", "carte bancaire", "mot de passe", "password",
+    "numéro de téléphone", "identité", "CNI", "passeport", "où es-tu",
+    "your address", "credit card", "bank account", "where do you live",
+    "أين تسكن", "كلمة السر", "رقم البطاقة"
+]
+
+def check_suspicious(text):
+    """Détecte si une question est suspecte"""
+    text_low = text.lower()
+    for flag in RED_FLAGS:
+        if flag.lower() in text_low:
+            return True, flag
+    return False, None
+
+def get_geolocation():
+    """Récupère la géolocalisation via IP"""
+    try:
+        import urllib.request, json
+        with urllib.request.urlopen("https://ipapi.co/json/", timeout=5) as r:
+            data = json.loads(r.read().decode())
+        return f"{data.get('city','?')}, {data.get('country_name','?')} ({data.get('ip','?')})"
+    except:
+        try:
+            with urllib.request.urlopen("https://api.ipify.org?format=json", timeout=4) as r:
+                ip = json.loads(r.read().decode()).get("ip","?")
+            return f"IP: {ip}"
+        except:
+            return "Position inconnue"
+
+def handle_suspicious_question(question, flag):
+    """Gère une question suspecte : log + alerte"""
+    location = get_geolocation()
+    alert = {
+        "ts": datetime.now().isoformat(),
+        "question": question,
+        "flag": flag,
+        "location": location,
+        "user": st.session_state.user_id
+    }
+    st.session_state.suspicious_log.append(alert)
+    # Sauvegarder dans fichier
+    try:
+        alert_path = Path("memory") / "alerts.json"
+        alert_path.parent.mkdir(exist_ok=True)
+        existing = json.loads(alert_path.read_text()) if alert_path.exists() else []
+        existing.append(alert)
+        alert_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False))
+    except:
+        pass
+    return location
+
+
+# ═══════════════════════════════════════════════════════════════
+# 👥 MODULE 3 : PROFILS UTILISATEURS AVANCÉS (livre p.89)
+# ═══════════════════════════════════════════════════════════════
+def load_user_profiles():
+    """Charge les profils depuis fichier JSON"""
+    try:
+        p = Path("memory") / "profiles.json"
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except:
+        pass
+    return {}
+
+def save_user_profiles(profiles):
+    """Sauvegarde les profils"""
+    try:
+        p = Path("memory") / "profiles.json"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(json.dumps(profiles, indent=2, ensure_ascii=False))
+    except:
+        pass
+
+def get_user_profile(user_id):
+    """Retourne le profil d'un utilisateur ou un profil par défaut"""
+    profiles = st.session_state.user_profiles
+    if user_id not in profiles:
+        profiles[user_id] = {
+            "nom": user_id,
+            "ton": "chaleureux",
+            "langue": "fr",
+            "niveau_detail": "normal",
+            "historique_count": 0,
+            "premiere_visite": datetime.now().isoformat(),
+            "derniere_visite": datetime.now().isoformat(),
+            "mots_interdits": [],
+            "sujets_favoris": [],
+            "humeur_habituelle": "neutre",
+            "id_hash": hashlib.sha256(user_id.encode()).hexdigest()[:12]
+        }
+        save_user_profiles(profiles)
+    else:
+        profiles[user_id]["derniere_visite"] = datetime.now().isoformat()
+        profiles[user_id]["historique_count"] = profiles[user_id].get("historique_count",0) + 1
+    return profiles[user_id]
+
+def build_personalized_prompt(base_prompt, user_id):
+    """Enrichit le prompt avec le profil utilisateur"""
+    profile = get_user_profile(user_id)
+    ton = profile.get("ton", "neutre")
+    sujets = ", ".join(profile.get("sujets_favoris", [])[:3]) or "aucun spécifique"
+    n = profile.get("historique_count", 0)
+    
+    prefix = f"[PROFIL {user_id[:8]}] Ton:{ton}, Visites:{n}, Sujets:{sujets}. "
+    if n == 0:
+        prefix += "C'est sa première visite — accueille-le chaleureusement. "
+    elif n > 10:
+        prefix += "C'est un utilisateur fidèle — sois familière et mémorable. "
+    return prefix + base_prompt
+
+
+# ═══════════════════════════════════════════════════════════════
+# 📖 MODULE 4 : BIBLIOTHÈQUE POÈMES & TEXTES (livre p.95)
+# ═══════════════════════════════════════════════════════════════
+LIBRARY_DEFAULT = {
+    "poemes": [
+        {"titre": "Liberté", "auteur": "Paul Éluard", "texte": "Sur mes cahiers d'écolier, sur mon pupitre et les arbres, sur le sable sur la neige, j'écris ton nom. Liberté.", "langue": "fr"},
+        {"titre": "نشيد المطر", "auteur": "بدر شاكر السياب", "texte": "عيناكِ غابتا نخيلٍ ساعةَ السَّحَر، أو شُرفتانِ راح ينأى عنهما القمر.", "langue": "ar"},
+        {"titre": "Hope", "auteur": "Emily Dickinson", "texte": "Hope is the thing with feathers that perches in the soul, and sings the tune without the words, and never stops at all.", "langue": "en"},
+    ],
+    "proverbes": [
+        {"titre": "Sagesse", "texte": "La connaissance est une lumière qui éclaire le chemin de ceux qui cherchent la vérité.", "langue": "fr"},
+        {"titre": "حكمة", "texte": "العلم نور والجهل ظلام، فاطلب العلم ولو في الصين.", "langue": "ar"},
+    ],
+    "citations": [
+        {"titre": "Ibn Khaldoun", "texte": "Celui qui ne connaît pas son histoire est condamné à la revivre.", "langue": "fr"},
+        {"titre": "الإمام علي", "texte": "قيمة كل امرئ ما يحسنه.", "langue": "ar"},
+    ]
+}
+
+def get_library():
+    """Charge la bibliothèque de textes"""
+    try:
+        p = Path("memory") / "library.json"
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except:
+        pass
+    return LIBRARY_DEFAULT
+
+def save_library(lib):
+    try:
+        p = Path("memory") / "library.json"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(json.dumps(lib, indent=2, ensure_ascii=False))
+    except:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════
+# 📊 MODULE 5 : DASHBOARD ADMIN (livre p.50)
+# ═══════════════════════════════════════════════════════════════
+def show_admin_dashboard():
+    """Affiche le tableau de bord administrateur"""
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,rgba(0,20,40,0.95),rgba(0,10,25,0.9));
+    border:1px solid rgba(0,255,200,0.3);border-radius:12px;padding:20px;margin:10px 0;">
+    <div style="font-family:Orbitron,monospace;font-size:1rem;color:#00ffcc;letter-spacing:3px;margin-bottom:15px;">
+    📊 DASHBOARD ADMIN — REIHANA SECURITY CENTER
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    c1, c2, c3, c4 = st.columns(4)
+    
+    # Stats
+    n_msgs = len(st.session_state.messages)
+    n_alerts = len(st.session_state.suspicious_log)
+    n_tokens = st.session_state.total_tokens
+    profiles = load_user_profiles()
+    n_users = len(profiles)
+    
+    with c1:
+        st.metric("💬 Messages", n_msgs)
+    with c2:
+        st.metric("⚠️ Alertes", n_alerts, delta=f"+{n_alerts}" if n_alerts else None)
+    with c3:
+        st.metric("⚡ Tokens", f"{n_tokens:,}")
+    with c4:
+        st.metric("👥 Profils", n_users)
+    
+    # Alertes suspectes
+    if st.session_state.suspicious_log:
+        st.markdown("### ⚠️ Questions Suspectes Détectées")
+        for alert in reversed(st.session_state.suspicious_log[-5:]):
+            st.markdown(f"""
+            <div style="background:rgba(255,50,50,0.1);border:1px solid rgba(255,100,100,0.3);
+            border-radius:8px;padding:10px;margin:4px 0;font-family:Rajdhani,sans-serif;">
+            🚨 <b>{alert.get('ts','?')[:16]}</b> — 
+            Flag: <code>{alert.get('flag','?')}</code> — 
+            Position: {alert.get('location','?')} — 
+            User: {alert.get('user','?')}
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.success("✅ Aucune alerte suspecte détectée")
+    
+    # Profils utilisateurs
+    if profiles:
+        st.markdown("### 👥 Profils Utilisateurs")
+        for uid, prof in list(profiles.items())[:5]:
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**{uid}** — Visites: {prof.get('historique_count',0)} — Ton: {prof.get('ton','?')} — Dernière: {prof.get('derniere_visite','?')[:10]}")
+    
+    # Conversations chiffrées
+    st.markdown("### 🔐 Conversations Chiffrées (AES)")
+    convs = decrypt_conversations()
+    if convs:
+        st.success(f"✅ {len(convs)} conversations sécurisées en mémoire")
+        if st.checkbox("Afficher les 3 dernières"):
+            for c in convs[-3:]:
+                st.markdown(f"**{c.get('ts','?')[:16]}** — Q: {c.get('q','?')[:60]}...")
+    else:
+        st.info("Aucune conversation chiffrée stockée")
+    
+    # Bouton purge
+    if st.button("🗑️ Purger les alertes", type="secondary"):
+        st.session_state.suspicious_log = []
+        try:
+            (Path("memory") / "alerts.json").unlink(missing_ok=True)
+        except:
+            pass
+        st.success("Alertes purgées !")
+        st.rerun()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🎵 MODULE 6 : BIBLIOTHÈQUE MUSICALE PERSONNALISÉE (livre p.96)
+# ═══════════════════════════════════════════════════════════════
+def recite_text(text, titre="", langue="fr"):
+    """REIHANA récite un texte avec gTTS"""
+    if not text:
+        return
+    full = f"{titre}. {text}" if titre else text
+    play_reihana_voice(full, lang=langue)
+
+def get_song_library():
+    """Retourne la bibliothèque de chansons personnalisées"""
+    try:
+        p = Path("memory") / "songs.json"
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except:
+        pass
+    return []
+
+def save_song_library(songs):
+    try:
+        p = Path("memory") / "songs.json"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(json.dumps(songs, indent=2, ensure_ascii=False))
+    except:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════════
+# ✋ MODULE 7 : DÉTECTION GESTUELLE (MediaPipe - livre p.80)
+# ═══════════════════════════════════════════════════════════════
+GESTURE_HTML = """
+<html><head>
+<style>
+  body{margin:0;background:transparent;font-family:Orbitron,monospace;}
+  #gzone{display:flex;align-items:center;gap:10px;padding:4px;}
+  #gBtn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(0,255,100,0.5);
+    background:rgba(0,20,10,0.9);color:#00ff88;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .2s;}
+  #gBtn.active{border-color:#00ff44;background:rgba(0,80,20,0.5);animation:gPulse .8s infinite;}
+  @keyframes gPulse{0%,100%{box-shadow:0 0 8px rgba(0,255,100,.4);}50%{box-shadow:0 0 20px rgba(0,255,100,.8);}}
+  #gStatus{font-size:9px;letter-spacing:2px;color:rgba(0,255,100,0.5);}
+  #gResult{font-size:11px;color:rgba(200,255,220,0.7);font-family:Rajdhani,sans-serif;}
+</style></head><body>
+<div id="gzone">
+  <button id="gBtn" onclick="toggleGesture()" title="Détection gestuelle">✋</button>
+  <div>
+    <div id="gStatus">GESTE PRÊT</div>
+    <div id="gResult">Cliquez ✋ pour activer</div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+<script>
+var _active=false, _cam=null, _hands=null, _lastGesture='', _cooldown=false;
+var gBtn=document.getElementById('gBtn');
+var gStatus=document.getElementById('gStatus');
+var gResult=document.getElementById('gResult');
+
+function classifyGesture(landmarks){
+  var wrist=landmarks[0];
+  var indexTip=landmarks[8], indexMCP=landmarks[5];
+  var middleTip=landmarks[12], middleMCP=landmarks[9];
+  var ringTip=landmarks[16], ringMCP=landmarks[13];
+  var pinkyTip=landmarks[20], pinkyMCP=landmarks[17];
+  var thumbTip=landmarks[4], thumbIP=landmarks[3];
+  
+  var indexUp=indexTip.y<indexMCP.y;
+  var middleUp=middleTip.y<middleMCP.y;
+  var ringUp=ringTip.y<ringMCP.y;
+  var pinkyUp=pinkyTip.y<pinkyMCP.y;
+  var thumbUp=thumbTip.y<thumbIP.y;
+  
+  if(indexUp&&middleUp&&!ringUp&&!pinkyUp) return "✌️ DEUX DOIGTS — Activer IA";
+  if(indexUp&&!middleUp&&!ringUp&&!pinkyUp) return "☝️ UN DOIGT — Valider";
+  if(thumbUp&&!indexUp&&!middleUp&&!ringUp&&!pinkyUp) return "👍 POUCE — J'aime";
+  if(!thumbUp&&!indexUp&&!middleUp&&!ringUp&&!pinkyUp) return "✊ POING — Pause";
+  if(indexUp&&middleUp&&ringUp&&pinkyUp) return "🖐️ MAIN OUVERTE — Stop";
+  return "🤚 Main détectée";
+}
+
+function sendGestureToStreamlit(gesture){
+  if(_cooldown) return;
+  _cooldown=true;
+  setTimeout(function(){_cooldown=false;},2000);
+  try{
+    var url=window.location.href.split("?")[0]+"?gesture="+encodeURIComponent(gesture);
+    window.parent.location.href=url;
+  }catch(e){
+    window.location.href=window.location.href.split("?")[0]+"?gesture="+encodeURIComponent(gesture);
+  }
+}
+
+function toggleGesture(){
+  if(_active){
+    _active=false;
+    gBtn.className='';gBtn.innerText='✋';
+    gStatus.innerText='GESTE PRÊT';gResult.innerText='Cliquez ✋ pour activer';
+    if(_cam)_cam.stop();
+  }else{
+    startGesture();
+  }
+}
+
+function startGesture(){
+  try{
+    var video=document.createElement('video');
+    video.style.display='none';
+    document.body.appendChild(video);
+    
+    _hands=new Hands({locateFile:function(file){
+      return 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/'+file;
+    }});
+    _hands.setOptions({maxNumHands:1,modelComplexity:0,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
+    _hands.onResults(function(results){
+      if(results.multiHandLandmarks&&results.multiHandLandmarks.length>0){
+        var g=classifyGesture(results.multiHandLandmarks[0]);
+        if(g!==_lastGesture){
+          _lastGesture=g;
+          gResult.innerText=g;
+          if(g!='🤚 Main détectée') sendGestureToStreamlit(g);
+        }
+      }else{
+        gResult.innerText='Montrez votre main...';
+        _lastGesture='';
+      }
+    });
+    
+    navigator.mediaDevices.getUserMedia({video:true})
+      .then(function(stream){
+        video.srcObject=stream;
+        video.play();
+        _active=true;
+        gBtn.className='active';gBtn.innerText='⏹';
+        gStatus.innerText='✋ DÉTECTION ACTIVE';
+        _cam=new Camera(video,{
+          onFrame:async function(){await _hands.send({image:video});},
+          width:320,height:240
+        });
+        _cam.start();
+      })
+      .catch(function(e){gStatus.innerText='🚫 Caméra refusée';});
+  }catch(e){gStatus.innerText='⚠️ MediaPipe non dispo';gResult.innerText='Utilisez Chrome';}
+}
+</script>
+</body></html>
+"""
+
+# ═══════════════════════════════════════════════════════════════
+# 👁️ MODULE 8 : RECONNAISSANCE FACIALE HTML (livre p.78)
+# ═══════════════════════════════════════════════════════════════
+FACE_HTML = """
+<html><head>
+<style>
+  body{margin:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}
+  #fzone{display:flex;align-items:center;gap:8px;padding:4px;}
+  #fBtn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(150,50,255,0.5);
+    background:rgba(20,0,40,0.9);color:#aa55ff;font-size:18px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .2s;}
+  #fBtn.scanning{border-color:#ff5588;color:#ff5588;animation:fPulse .6s infinite;}
+  @keyframes fPulse{0%,100%{box-shadow:0 0 8px rgba(255,50,100,.4);}50%{box-shadow:0 0 22px rgba(255,50,100,.9);}}
+  #fStatus{font-size:9px;letter-spacing:2px;color:rgba(150,50,255,0.5);}
+  #fResult{font-size:11px;color:rgba(220,180,255,0.8);font-family:Rajdhani,sans-serif;}
+  #fCanvas{display:none;width:200px;height:150px;border-radius:8px;border:1px solid rgba(150,50,255,0.3);}
+</style></head><body>
+<div id="fzone">
+  <button id="fBtn" onclick="toggleFace()" title="Reconnaissance faciale">👁️</button>
+  <div>
+    <div id="fStatus">CAMÉRA PRÊTE</div>
+    <div id="fResult">Cliquez 👁️ pour scanner</div>
+  </div>
+</div>
+<canvas id="fCanvas"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+var _factive=false, _fstream=null, _fvideo=null, _fint=null;
+var fBtn=document.getElementById('fBtn');
+var fStatus=document.getElementById('fStatus');
+var fResult=document.getElementById('fResult');
+var fCanvas=document.getElementById('fCanvas');
+
+function toggleFace(){
+  if(_factive) stopFace();
+  else startFace();
+}
+
+async function startFace(){
+  try{
+    fStatus.innerText='⏳ CHARGEMENT MODÈLES...';
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+      faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+      faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+    ]);
+    
+    var stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240},audio:false});
+    _fstream=stream;
+    _fvideo=document.createElement('video');
+    _fvideo.srcObject=stream;
+    _fvideo.play();
+    _factive=true;
+    fBtn.className='scanning';fBtn.innerText='⏹';
+    fStatus.innerText='👁️ SCAN EN COURS...';
+    fCanvas.style.display='block';
+    
+    _fint=setInterval(async function(){
+      if(!_fvideo||!_factive) return;
+      var det=await faceapi.detectSingleFace(_fvideo,new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions().withAgeAndGender();
+      if(det){
+        var age=Math.round(det.age);
+        var gender=det.gender==='male'?'Homme':'Femme';
+        var exprs=det.expressions;
+        var topExpr=Object.entries(exprs).sort(function(a,b){return b[1]-a[1];})[0][0];
+        var exprFr={happy:'Heureux',sad:'Triste',angry:'En colère',fearful:'Craintif',disgusted:'Dégoûté',surprised:'Surpris',neutral:'Neutre'};
+        fResult.innerText=gender+' ~'+age+' ans — '+( exprFr[topExpr]||topExpr );
+        fStatus.innerText='✅ VISAGE DÉTECTÉ';
+        // Envoyer à Streamlit
+        try{
+          var url=window.location.href.split("?")[0]
+            +"?face_detected=1&face_age="+age+"&face_gender="+gender+"&face_expr="+(exprFr[topExpr]||topExpr);
+          window.parent.history.replaceState(null,'',url);
+        }catch(e){}
+      }else{
+        fResult.innerText='Aucun visage visible...';
+        fStatus.innerText='👁️ SCAN EN COURS...';
+      }
+    },1500);
+  }catch(e){
+    fStatus.innerText='⚠️ '+e.message;
+    fResult.innerText='Chrome requis';
+  }
+}
+
+function stopFace(){
+  _factive=false;
+  clearInterval(_fint);
+  if(_fstream)_fstream.getTracks().forEach(function(t){t.stop();});
+  _fvideo=null;_fstream=null;
+  fBtn.className='';fBtn.innerText='👁️';
+  fStatus.innerText='CAMÉRA PRÊTE';
+  fResult.innerText='Cliquez 👁️ pour scanner';
+  fCanvas.style.display='none';
+}
+</script>
+</body></html>
+"""
+
+
 def web_search(query, n=5):
     try:
         url=f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}&format=json&no_html=1&skip_disambig=1"
@@ -1042,6 +1593,14 @@ def process_msg(question, regen=False, regen_idx=None):
     detected=detect_lang(question)
     if detected!="🇫🇷 Français" and detected!=st.session_state.langue:
         st.session_state.langue=detected
+    
+    # ── Vérification question suspecte (livre p.45) ──
+    is_suspicious, flag = check_suspicious(question)
+    if is_suspicious and not regen:
+        location = handle_suspicious_question(question, flag)
+        st.warning(f"⚠️ Question sensible détectée (mot-clé: `{flag}`) — Position enregistrée: {location}")
+    
+    # ── Enrichir prompt avec profil utilisateur ──
     results=[]
     web_ctx=""
     if st.session_state.web_search_on:
@@ -1486,18 +2045,77 @@ window.reiSetVol=setVol;
         st.markdown(f'<div class="stat-badge">📚 {len(st.session_state.fichiers_contexte)} fichier(s)</div>', unsafe_allow_html=True)
         if st.button("🗑️ VIDER"): st.session_state.fichiers_contexte=[]; st.rerun()
     st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
+    
+    # ══ MODULE BIBLIOTHÈQUE (livre p.95) ══
+    st.markdown('<div class="stat-badge">📚 BIBLIOTHÈQUE</div>', unsafe_allow_html=True)
+    lib = get_library()
+    all_lib_texts = lib.get('poemes',[]) + lib.get('proverbes',[]) + lib.get('citations',[])
+    lib_choices = ["-- Choisir un texte --"] + [f"{t.get('titre','?')} ({t.get('auteur',t.get('langue',''))})" for t in all_lib_texts]
+    lib_sel = st.selectbox("", lib_choices, label_visibility="collapsed", key="lib_sel")
+    clib1, clib2 = st.columns(2)
+    with clib1:
+        if st.button("▶️ Réciter", use_container_width=True, key="recite_btn") and lib_sel != lib_choices[0]:
+            for txt in all_lib_texts:
+                if txt.get('titre','') in lib_sel:
+                    st.info(f"📖 {txt.get('texte','')[:120]}...")
+                    recite_text(txt.get('texte',''), titre=txt.get('titre',''), langue=txt.get('langue','fr'))
+                    break
+    with clib2:
+        if st.button("➕ Ajouter", use_container_width=True, key="lib_add_btn"):
+            st.session_state.show_lib_form = not st.session_state.get("show_lib_form", False)
+    if st.session_state.get("show_lib_form", False):
+        nt = st.text_input("Titre", key="lib_new_t")
+        ntx = st.text_area("Texte", key="lib_new_tx", height=60)
+        nl = st.selectbox("Langue", ["fr","ar","en"], key="lib_new_l")
+        if st.button("💾 Sauvegarder", key="lib_save_btn") and nt and ntx:
+            lib.setdefault('poemes',[]).append({"titre":nt,"texte":ntx,"langue":nl,"auteur":st.session_state.user_id})
+            save_library(lib)
+            st.session_state.show_lib_form = False
+            st.success("✅ Ajouté !")
+            st.rerun()
+
+    # ══ MODULE RECONNAISSANCE FACIALE + GESTES (livre p.78-80) ══
+    st.markdown('<div class="stat-badge">🔬 CAPTEURS IA</div>', unsafe_allow_html=True)
+    import streamlit.components.v1 as _sens_comp
+    csens1, csens2 = st.columns(2)
+    with csens1:
+        st.markdown('<div style="font-family:Orbitron,monospace;font-size:0.6rem;color:rgba(150,50,255,0.6);text-align:center;">👁️ VISAGE</div>', unsafe_allow_html=True)
+        _sens_comp.html(FACE_HTML, height=60)
+    with csens2:
+        st.markdown('<div style="font-family:Orbitron,monospace;font-size:0.6rem;color:rgba(0,255,100,0.6);text-align:center;">✋ GESTES</div>', unsafe_allow_html=True)
+        _sens_comp.html(GESTURE_HTML, height=60)
+
+    # ══ SÉCURITÉ : chiffrement toggle ══
+    enc_label = "🔐 AES ON" if st.session_state.conv_encrypted else "🔓 AES OFF"
+    if st.button(enc_label, use_container_width=True, key="aes_toggle"):
+        st.session_state.conv_encrypted = not st.session_state.conv_encrypted
+        st.rerun()
+
+    # ══ ALERTES : compteur ══
+    n_alerts = len(st.session_state.suspicious_log)
+    if n_alerts > 0:
+        st.markdown(f'<div class="stat-badge" style="border-color:rgba(255,80,80,0.5);color:#ff8888;">⚠️ {n_alerts} ALERTE(S) SUSPECTE(S)</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
     if st.button(f"📊 DASHBOARD {'▲' if st.session_state.show_dashboard else '▼'}", use_container_width=True):
         st.session_state.show_dashboard=not st.session_state.show_dashboard; st.rerun()
     if st.session_state.show_dashboard:
         ai_c=len([m for m in st.session_state.messages if m["role"]=="assistant"])
+        n_al = len(st.session_state.suspicious_log)
+        convs_enc = decrypt_conversations()
         st.markdown(f"""<div class="dash-grid">
             <div class="dash-card"><div class="dash-num">{len(st.session_state.messages)}</div><div class="dash-lbl">MSGS</div></div>
             <div class="dash-card"><div class="dash-num">{st.session_state.total_tokens:,}</div><div class="dash-lbl">TOKENS</div></div>
-            <div class="dash-card"><div class="dash-num">{len(st.session_state.liked_messages)}</div><div class="dash-lbl">❤️ LIKES</div></div>
-            <div class="dash-card"><div class="dash-num">{len(st.session_state.conversation_history)}</div><div class="dash-lbl">HISTORIQUE</div></div>
+            <div class="dash-card"><div class="dash-num" style="color:#ff8888;">{n_al}</div><div class="dash-lbl">⚠️ ALERTES</div></div>
+            <div class="dash-card"><div class="dash-num" style="color:#88ff88;">{len(convs_enc)}</div><div class="dash-lbl">🔐 CHIFFRÉS</div></div>
         </div>
         <div class="stat-badge">⏱️ SESSION : {st.session_state.session_start}</div>
-        <div class="stat-badge">🤖 {ai_c} RÉPONSES</div>""", unsafe_allow_html=True)
+        <div class="stat-badge">🤖 {ai_c} RÉPONSES</div>
+        <div class="stat-badge">{'🔐 CHIFFREMENT AES ACTIF' if st.session_state.conv_encrypted else '🔓 CHIFFREMENT DÉSACTIVÉ'}</div>""", unsafe_allow_html=True)
+        if n_al > 0:
+            if st.button("🔍 Voir alertes", use_container_width=True, key="view_alerts"):
+                st.session_state.admin_dashboard_open = True
+                st.rerun()
         if hasattr(st.session_state,'engine'):
             stats=st.session_state.engine.get_stats()
             st.markdown(f'<div class="stat-badge">⚡ CLÉ #{stats.get("cle_active",1)} | {stats.get("modele_actif","")[:18]}</div>', unsafe_allow_html=True)
@@ -2174,6 +2792,10 @@ if send_btn and user_input and user_input.strip():
         st.markdown(wh, unsafe_allow_html=True)
     st.session_state.mémoire.add_exchange(st.session_state.user_id,question,rep)
     st.session_state.messages.append({"role":"assistant","content":rep})
+    # ── Chiffrer et sauvegarder (livre p.45) ──
+    encrypt_conversation(question, rep)
+    # ── Mettre à jour profil utilisateur ──
+    get_user_profile(st.session_state.user_id)
     st.markdown(f'<div style="font-family:Orbitron,monospace;font-size:0.57rem;color:rgba(150,150,200,0.38);text-align:right;margin:-3px 0 5px 0;">⚡ {res.get("model","")[:26]} · {res.get("tokens",0)} tokens</div>', unsafe_allow_html=True)
     # Détecter chanson et stocker
     _is_song, _smood, _slang, _sverses = detect_song(rep)
@@ -2184,6 +2806,38 @@ if send_btn and user_input and user_input.strip():
         _auto_lang = detect_text_lang(rep)
         play_reihana_voice(rep, lang=_auto_lang)
     st.rerun()
+
+# ══ DASHBOARD ADMIN ÉTENDU (livre p.50) ══
+if st.session_state.admin_dashboard_open:
+    st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
+    show_admin_dashboard()
+
+# ══ TRAITER GESTE DÉTECTÉ ══
+_gesture_in = st.query_params.get("gesture", "")
+if _gesture_in and _gesture_in != st.session_state.get("last_gesture",""):
+    st.session_state.last_gesture = _gesture_in
+    st.query_params.clear()
+    gesture_actions = {
+        "☝️ UN DOIGT — Valider": lambda: None,  # valider
+        "✊ POING — Pause": lambda: None,  # pause
+        "🖐️ MAIN OUVERTE — Stop": lambda: None,  # stop
+        "✌️ DEUX DOIGTS — Activer IA": lambda: None,  # activer
+        "👍 POUCE — J'aime": lambda: None,  # j'aime
+    }
+    st.toast(f"✋ Geste détecté : {_gesture_in}", icon="✋")
+    if "STOP" in _gesture_in.upper() or "MAIN OUVERTE" in _gesture_in:
+        st.session_state.voice_input = ""
+
+# ══ TRAITER VISAGE DÉTECTÉ ══
+_face_det = st.query_params.get("face_detected","")
+if _face_det:
+    _face_age = st.query_params.get("face_age","?")
+    _face_gender = st.query_params.get("face_gender","?")
+    _face_expr = st.query_params.get("face_expr","?")
+    st.session_state.face_access_log.append({
+        "ts": datetime.now().isoformat(),
+        "age": _face_age, "gender": _face_gender, "expression": _face_expr
+    })
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 st.markdown(f'<div style="font-family:Orbitron,monospace;color:rgba({g},0.45);font-size:0.6rem;letter-spacing:3px;margin-bottom:8px;">SUGGESTIONS RAPIDES</div>', unsafe_allow_html=True)
