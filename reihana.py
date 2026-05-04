@@ -1595,23 +1595,16 @@ st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 _stt_lang_map = {"🇫🇷 Français":"fr-FR","🇩🇿 العربية":"ar-SA","🇬🇧 English":"en-US"}
 _stt_lang = _stt_lang_map.get(st.session_state.langue,"fr-FR")
 
-# ── Listener postMessage v11 : reçoit le message depuis l'iframe widget ──
-import streamlit.components.v1 as _cmp_pm
-_cmp_pm.html("""
-<script>
-window.addEventListener("message", function(e){
-  if(e.data && e.data.type === "reihana_send"){
-    var url = window.location.pathname + "?vt=" + encodeURIComponent(e.data.text) + "&vs=1";
-    window.location.href = url;
-  }
-});
-</script>
-""", height=0)
-
-# ── Lire texte + commande envoi depuis query params ──
+# ── Lire texte depuis composant (v12) OU query_params (fallback) ──
 _qp = st.query_params
 _vt = _qp.get("vt","").strip()
-_vs = _qp.get("vs","0")
+_vs = "1"
+# Lire aussi la valeur retournée par setComponentValue (définie après le widget)
+if not _vt and "last_cmp_val" in st.session_state:
+    _cdata = st.session_state.get("last_cmp_val")
+    if isinstance(_cdata, dict) and _cdata.get("text","").strip():
+        _vt = _cdata["text"].strip()
+        st.session_state.last_cmp_val = None
 if _vt and _vt != st.session_state.get("last_voice_text",""):
     st.session_state.input_value = _vt
     st.session_state.last_voice_text = _vt
@@ -1641,7 +1634,8 @@ if _vt and _vt != st.session_state.get("last_voice_text",""):
 # ── Widget HTML complet v9 — textarea + MICRO + STOP + ENVOYER (style ChatGPT) ──
 _init_val = st.session_state.get("input_value","").replace("\\","\\\\").replace("`","\\`")
 import streamlit.components.v1 as _cmp
-_cmp.html(f"""
+_cmp_val = _cmp.html(f"""
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{background:transparent;font-family:'Orbitron',monospace;}}
@@ -1825,8 +1819,13 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
     if(!t)return;
     if(on)stopRec();
     setSt("ok","📨 Envoi en cours...");
-    // v11 : postMessage évite le blocage cross-origin de window.parent.location
-    window.parent.postMessage({{type:"reihana_send",text:t}},"*");
+    // ✅ v12 : Streamlit.setComponentValue — seule méthode fiable sur HTTPS/Render
+    try {{
+      Streamlit.setComponentValue({{text:t, ts:Date.now()}});
+    }} catch(e) {{
+      // fallback si Streamlit non dispo
+      window.parent.postMessage({{type:"reihana_send",text:t}},"*");
+    }}
   }}
 
   bMic.onclick=startRec;
@@ -1835,9 +1834,17 @@ body{{background:transparent;font-family:'Orbitron',monospace;}}
   ta.addEventListener("keydown",function(e){{
     if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){{e.preventDefault();sendMsg();}}
   }});
+
+  // Signaler à Streamlit que le composant est prêt
+  Streamlit.setFrameHeight(160);
 }})();
 </script>
 """, height=160, scrolling=False)
+
+# ── Capturer valeur retournée par setComponentValue ──
+if _cmp_val is not None and isinstance(_cmp_val, dict) and _cmp_val.get("text","").strip():
+    st.session_state.last_cmp_val = _cmp_val
+    st.rerun()
 
 # Variables nécessaires pour la suite du code (regen etc.)
 user_input = st.session_state.get("input_value","")
