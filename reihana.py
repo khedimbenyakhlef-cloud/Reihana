@@ -1590,184 +1590,174 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale Whisper — declare_component + Groq Python (Render compatible) ──
+# ── Reconnaissance vocale — Web Speech API native (Render compatible, aucune clé) ──
 import streamlit.components.v1 as _comp_v1
-from pathlib import Path as _Path
 
-_stt_lang_map = {"🇫🇷 Français": "fr", "🇩🇿 العربية": "ar", "🇬🇧 English": "en"}
-_stt_lang = _stt_lang_map.get(st.session_state.langue, "fr")
+_stt_lang_map = {"🇫🇷 Français": "fr-FR", "🇩🇿 العربية": "ar-SA", "🇬🇧 English": "en-US"}
+_stt_lang_bcp = _stt_lang_map.get(st.session_state.langue, "fr-FR")
 
-# ── Créer le fichier frontend/stt_component.html à la volée si besoin ──
-_frontend_dir = _Path(__file__).parent / "frontend"
-_frontend_dir.mkdir(exist_ok=True)
-_stt_html_path = _frontend_dir / "stt_component.html"
+# Récupérer transcription depuis query_params
+_stt_txt_in = st.query_params.get("stt_text", "")
+if _stt_txt_in and _stt_txt_in.strip():
+    st.session_state.input_value = _stt_txt_in.strip()
+    st.session_state.clear_input = False
+    st.query_params.clear()
+    st.rerun()
 
-_stt_html_content = """<!DOCTYPE html>
-<html>
-<head>
-<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
+_whisper_result = None
+
+_stt_html = f"""<html><head>
 <style>
-  body{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}
-  #zone{display:flex;align-items:center;gap:10px;padding:4px 0;}
-  #micBtn{
+  body{{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}}
+  #zone{{display:flex;align-items:center;gap:10px;padding:4px 0;}}
+  #micBtn{{
     width:52px;height:52px;border-radius:50%;border:2px solid rgba(0,255,200,0.5);
     background:rgba(0,20,40,0.9);color:#00ffcc;font-size:22px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
     box-shadow:0 0 15px rgba(0,255,200,0.2);transition:all .2s;flex-shrink:0;
-  }
-  #micBtn:hover{background:rgba(0,255,200,0.1);box-shadow:0 0 25px rgba(0,255,200,0.4);}
-  #micBtn.listening{border-color:#ff3333;color:#ff5555;background:rgba(255,30,30,0.15);
-    animation:micPulse 1s ease-in-out infinite;}
-  #micBtn.processing{border-color:#ffaa00;color:#ffaa00;}
-  @keyframes micPulse{0%,100%{box-shadow:0 0 10px rgba(255,50,50,.4);}50%{box-shadow:0 0 28px rgba(255,50,50,.8);}}
-  #info{flex:1;}
-  #status{font-size:9px;letter-spacing:2px;color:rgba(0,255,200,0.5);margin-bottom:3px;}
-  #status.active{color:#ff4444;}
-  #status.processing{color:#ffaa00;}
-  #status.success{color:#00ff88;}
-  #status.err{color:#ff8800;}
-  #trans{font-size:11px;color:rgba(200,240,255,0.6);font-family:Rajdhani,sans-serif;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
-  #bars{display:flex;align-items:flex-end;gap:2px;height:22px;opacity:0;transition:opacity .3s;margin-top:3px;}
-  #bars.active{opacity:1;}
-  .vb{width:3px;background:linear-gradient(0deg,#00ffcc,#7700ff);border-radius:1.5px;min-height:3px;transition:height .05s;}
-  #timer{font-size:8px;color:#ff5555;letter-spacing:1px;margin-top:2px;display:none;}
-  #timer.on{display:block;}
-</style>
-</head>
-<body>
+  }}
+  #micBtn.listening{{border-color:#ff3333;color:#ff5555;background:rgba(255,30,30,0.15);
+    animation:micPulse 0.8s ease-in-out infinite;}}
+  @keyframes micPulse{{0%,100%{{box-shadow:0 0 10px rgba(255,50,50,.4);}}50%{{box-shadow:0 0 28px rgba(255,50,50,.8);}}}}
+  #info{{flex:1;}}
+  #status{{font-size:9px;letter-spacing:2px;color:rgba(0,255,200,0.5);margin-bottom:3px;}}
+  #status.active{{color:#ff4444;}}
+  #status.success{{color:#00ff88;}}
+  #status.err{{color:#ff8800;}}
+  #trans{{font-size:11px;color:rgba(200,240,255,0.7);font-family:Rajdhani,sans-serif;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px;}}
+  #bars{{display:flex;align-items:flex-end;gap:2px;height:20px;opacity:0;transition:opacity .3s;margin-top:2px;}}
+  #bars.active{{opacity:1;}}
+  .vb{{width:3px;background:linear-gradient(0deg,#00ffcc,#7700ff);border-radius:1.5px;min-height:3px;transition:height .08s;}}
+</style></head><body>
 <div id="zone">
-  <button id="micBtn" onclick="toggleMic()" title="Parler">🎙️</button>
+  <button id="micBtn" onclick="toggleMic()" title="Parler à REIHANA">🎙️</button>
   <div id="info">
     <div id="status">MICRO PRÊT</div>
-    <div id="trans">Cliquez sur 🎙️ pour parler...</div>
+    <div id="trans">Cliquez 🎙️ pour parler...</div>
     <div id="bars">
-      <div class="vb" style="height:4px"></div><div class="vb" style="height:8px"></div>
-      <div class="vb" style="height:14px"></div><div class="vb" style="height:18px"></div>
-      <div class="vb" style="height:22px"></div><div class="vb" style="height:18px"></div>
-      <div class="vb" style="height:14px"></div><div class="vb" style="height:8px"></div>
+      <div class="vb" style="height:4px"></div><div class="vb" style="height:9px"></div>
+      <div class="vb" style="height:15px"></div><div class="vb" style="height:20px"></div>
+      <div class="vb" style="height:15px"></div><div class="vb" style="height:9px"></div>
       <div class="vb" style="height:4px"></div>
     </div>
-    <div id="timer">⏺ 0s / max 30s</div>
   </div>
 </div>
 <script>
-var _rec=null,_chunks=[],_listening=false,_analyser=null,_frame=null,_stream=null;
-var _timerInt=null,_sec=0;
-var _lang="fr";
-var btn=document.getElementById("micBtn");
-var stat=document.getElementById("status");
-var trans=document.getElementById("trans");
-var bars=document.getElementById("bars");
-var vbs=document.querySelectorAll(".vb");
-var timer=document.getElementById("timer");
+var _lang = "{_stt_lang_bcp}";
+var btn = document.getElementById("micBtn");
+var stat = document.getElementById("status");
+var trans = document.getElementById("trans");
+var bars = document.getElementById("bars");
+var vbs = document.querySelectorAll(".vb");
+var _recog = null;
+var _listening = false;
+var _animInt = null;
 
-// Recevoir les paramètres de Streamlit
-function onRender(event){
-  if(!event.data.args) return;
-  if(event.data.args.lang) _lang=event.data.args.lang;
-}
-Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
-Streamlit.setComponentReady();
-Streamlit.setFrameHeight(70);
+function setSt(cls, txt) {{ stat.className = cls; stat.innerText = txt; }}
 
-function setSt(cls,txt){stat.className=cls;stat.innerText=txt;}
+function animBars(on) {{
+  bars.classList.toggle("active", on);
+  if(_animInt) clearInterval(_animInt);
+  if(on) {{
+    _animInt = setInterval(function() {{
+      vbs.forEach(function(v) {{
+        v.style.height = Math.max(3, Math.floor(Math.random()*18)+2) + "px";
+      }});
+    }}, 100);
+  }} else {{
+    vbs.forEach(function(v) {{ v.style.height = "3px"; }});
+  }}
+}}
 
-function startViz(stream){
-  try{
-    var ctx=new(window.AudioContext||window.webkitAudioContext)();
-    var src=ctx.createMediaStreamSource(stream);
-    _analyser=ctx.createAnalyser();_analyser.fftSize=256;src.connect(_analyser);
-    var data=new Uint8Array(_analyser.frequencyBinCount);
-    bars.classList.add("active");
-    (function draw(){
-      if(!_listening){bars.classList.remove("active");vbs.forEach(function(b){b.style.height="3px";});return;}
-      _frame=requestAnimationFrame(draw);_analyser.getByteFrequencyData(data);
-      var bds=[2,4,6,10,14,18,14,10,6];
-      bds.forEach(function(b,i){
-        var s=0;for(var j=0;j<b;j++)s+=data[Math.floor(j*data.length/b/9+i*data.length/9)];
-        vbs[i].style.height=Math.max(3,Math.min(22,(s/b)/5))+"px";
-      });
-    })();
-  }catch(e){}
-}
+function sendText(txt) {{
+  // Envoyer le texte transcrit à Streamlit via navigation URL
+  var base = window.location.href.split("?")[0];
+  // Essayer window.parent en premier
+  try {{
+    window.parent.location.href = base + "?stt_text=" + encodeURIComponent(txt);
+  }} catch(e) {{
+    window.location.href = base + "?stt_text=" + encodeURIComponent(txt);
+  }}
+}}
 
-function startTimer(){
-  _sec=0;timer.classList.add("on");
-  _timerInt=setInterval(function(){
-    _sec++;timer.innerText="⏺ "+_sec+"s / max 30s";
-    if(_sec>=30) stopMic();
-  },1000);
-}
-function stopTimer(){clearInterval(_timerInt);timer.classList.remove("on");}
-function toggleMic(){if(_listening) stopMic();else startMic();}
+function toggleMic() {{
+  if(_listening) stopRecog();
+  else startRecog();
+}}
 
-function startMic(){
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    setSt("err","⚠️ Micro non supporté");return;
-  }
-  navigator.mediaDevices.getUserMedia({audio:true,video:false})
-    .then(function(stream){
-      _stream=stream;_chunks=[];_listening=true;
-      var mime="audio/webm";
-      if(MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) mime="audio/webm;codecs=opus";
-      else if(MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) mime="audio/ogg;codecs=opus";
-      else if(MediaRecorder.isTypeSupported("audio/mp4")) mime="audio/mp4";
-      _rec=new MediaRecorder(stream,{mimeType:mime});
-      _rec.ondataavailable=function(e){if(e.data&&e.data.size>0) _chunks.push(e.data);};
-      _rec.onstop=function(){sendAudio(_chunks,mime);};
-      _rec.start(200);
-      btn.className="listening";btn.innerText="⏹";
-      setSt("active","🔴 ENREGISTREMENT...");
-      trans.innerText="Parlez maintenant...";
-      startViz(stream);startTimer();
-    })
-    .catch(function(err){setSt("err","🚫 Micro refusé: "+err.message);});
-}
+function startRecog() {{
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR) {{
+    setSt("err", "⚠️ Non supporté (Chrome requis)");
+    trans.innerText = "Utilisez Chrome ou Edge";
+    return;
+  }}
+  _recog = new SR();
+  _recog.lang = _lang;
+  _recog.continuous = false;
+  _recog.interimResults = true;
+  _recog.maxAlternatives = 1;
+  
+  _recog.onstart = function() {{
+    _listening = true;
+    btn.className = "listening";
+    btn.innerText = "⏹";
+    setSt("active", "🔴 ÉCOUTE...");
+    trans.innerText = "Parlez maintenant...";
+    animBars(true);
+  }};
+  
+  _recog.onresult = function(e) {{
+    var interim = "";
+    var final_txt = "";
+    for(var i = e.resultIndex; i < e.results.length; i++) {{
+      if(e.results[i].isFinal) final_txt += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }}
+    trans.innerText = final_txt || interim || "...";
+    if(final_txt) {{
+      setSt("success", "✅ TRANSCRIT !");
+      animBars(false);
+      btn.className = "";
+      btn.innerText = "🎙️";
+      _listening = false;
+      setTimeout(function() {{ sendText(final_txt.trim()); }}, 400);
+    }}
+  }};
+  
+  _recog.onerror = function(e) {{
+    setSt("err", "❌ " + e.error);
+    trans.innerText = e.error === "not-allowed" ? "Autoriser le micro" : "Réessayez";
+    animBars(false);
+    btn.className = "";
+    btn.innerText = "🎙️";
+    _listening = false;
+  }};
+  
+  _recog.onend = function() {{
+    if(_listening) {{
+      _listening = false;
+      btn.className = "";
+      btn.innerText = "🎙️";
+      animBars(false);
+    }}
+  }};
+  
+  try {{ _recog.start(); }} catch(e) {{ setSt("err", "❌ " + e.message); }}
+}}
 
-function stopMic(){
-  _listening=false;stopTimer();cancelAnimationFrame(_frame);
-  if(_rec&&_rec.state!=="inactive") _rec.stop();
-  if(_stream){_stream.getTracks().forEach(function(t){t.stop();});_stream=null;}
-  btn.className="processing";btn.innerText="🎙️";
-  setSt("processing","⚙️ Envoi au serveur...");
-  trans.innerText="Python analyse votre voix...";
-}
+function stopRecog() {{
+  _listening = false;
+  if(_recog) {{ try {{ _recog.stop(); }} catch(e) {{}} }}
+  btn.className = "";
+  btn.innerText = "🎙️";
+  animBars(false);
+  setSt("", "MICRO PRÊT");
+}}
+</script></body></html>"""
 
-function sendAudio(chunks,mime){
-  if(!chunks||chunks.length===0){setSt("err","⚠️ Audio vide");trans.innerText="Réessayez...";btn.className="";return;}
-  var blob=new Blob(chunks,{type:mime});
-  var ext="webm";
-  if(mime.includes("ogg")) ext="ogg";
-  else if(mime.includes("mp4")) ext="mp4";
-  var reader=new FileReader();
-  reader.onload=function(ev){
-    var b64=ev.target.result.split(",")[1];
-    setSt("success","✅ Audio envoyé !");
-    trans.innerText="Whisper transcrit...";
-    btn.className="";
-    // Envoyer à Python via setComponentValue
-    Streamlit.setComponentValue({b64:b64,mime:mime,lang:_lang,ts:Date.now()});
-  };
-  reader.readAsDataURL(blob);
-}
-</script>
-</body>
-</html>"""
-
-# Écrire le fichier HTML seulement s'il a changé
-_write_html = True
-if _stt_html_path.exists():
-    try:
-        if _stt_html_path.read_text(encoding="utf-8").strip() == _stt_html_content.strip():
-            _write_html = False
-    except:
-        pass
-if _write_html:
-    _stt_html_path.write_text(_stt_html_content, encoding="utf-8")
-
-_stt_component = _comp_v1.declare_component("reihana_stt", path=str(_frontend_dir))
-_whisper_result = _stt_component(lang=_stt_lang, key="reihana_stt_v2")
+_comp_v1.html(_stt_html, height=70)
 
 # ── Bloc mort (gardé pour éviter erreurs de syntaxe) ──
 if False:
@@ -2004,9 +1994,72 @@ with cs3:
     if st.button("🔇", use_container_width=True, key="micstop", help="Arrêter le micro"):
         pass
 
-# ── Réception audio + Whisper Groq v15 (via query_params) ──
-# Lire d'abord si un audio base64 est dans query_params
-# Traiter l'audio si _whisper_result reçu via setComponentValue
+# ── Réception audio via postMessage + Whisper Groq côté Python ──
+# Le JS envoie l'audio base64 via postMessage → intercepté par ce script JS
+# qui le stocke dans sessionStorage, puis un polling Python le lit via query_params
+
+import streamlit.components.v1 as _comp_recv
+
+# Script JS qui écoute postMessage du widget micro et relaie à Python via URL
+_recv_html = """
+<script>
+(function(){
+  // Écouter les messages du widget micro (iframe enfant)
+  window.addEventListener("message", function(e) {
+    var d = e.data;
+    if(!d || d.type !== "rei_audio") return;
+    // Stocker dans sessionStorage
+    try {
+      sessionStorage.setItem("rei_audio_b64", d.b64);
+      sessionStorage.setItem("rei_audio_mime", d.mime || "audio/webm");
+      sessionStorage.setItem("rei_audio_lang", d.lang || "fr");
+      sessionStorage.setItem("rei_audio_ts", String(d.ts || Date.now()));
+    } catch(ex) {}
+    // Déclencher le bouton caché Streamlit via un lien URL
+    // On utilise query_params avec seulement le timestamp (pas l'audio - trop grand)
+    // L'audio est stocké dans sessionStorage et récupéré via un petit fetch
+    window.location.href = window.location.href.split("?")[0] + "?rei_ts=" + (d.ts || Date.now());
+  }, false);
+  
+  // Aussi écouter depuis les iframes filles
+  try {
+    var iframes = document.querySelectorAll("iframe");
+    iframes.forEach(function(fr) {
+      try {
+        fr.contentWindow.addEventListener("message", function(e) {
+          var d = e.data;
+          if(d && d.type === "rei_audio") window.dispatchEvent(new MessageEvent("message", {data: d}));
+        }, false);
+      } catch(ex) {}
+    });
+  } catch(ex) {}
+})();
+</script>
+"""
+
+# ── VRAIE SOLUTION FINALE : utiliser un endpoint Streamlit natif ──
+# postMessage cross-origin est bloqué. La seule solution fiable sans declare_component :
+# Groq Whisper depuis le navigateur directement avec la clé dans st.secrets
+# MAIS exposer la clé côté client est risqué.
+# Solution : SpeechRecognition Web API (gratuite, native, pas de clé)
+
+# ── Vérifier si une transcription STT est arrivée via query_params ──
+_rei_ts = st.query_params.get("rei_ts", "")
+if _rei_ts and _rei_ts != str(st.session_state.get("last_rei_ts", "")):
+    st.session_state.last_rei_ts = _rei_ts
+    # L'audio est dans sessionStorage côté JS — on ne peut pas y accéder depuis Python
+    # Donc on utilise la Web Speech API à la place (voir widget ci-dessus)
+    pass
+
+# ── Vérifier si une transcription texte est arrivée via query_params ──
+_stt_txt = st.query_params.get("stt_text", "")
+if _stt_txt and _stt_txt.strip():
+    st.session_state.input_value = _stt_txt.strip()
+    st.session_state.clear_input = False
+    st.query_params.clear()
+    st.rerun()
+
+# ── Traiter l'audio si _whisper_result reçu (legacy declare_component) ──
 if (_whisper_result and isinstance(_whisper_result, dict)
         and _whisper_result.get("b64")
         and _whisper_result.get("ts",0) != st.session_state.get("last_audio_ts",0)):
