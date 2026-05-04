@@ -714,7 +714,6 @@ defs = {
     "total_tokens":0,"session_start":datetime.now().strftime("%H:%M"),
     "last_song":{"verses":[],"mood":"calm","lang":"fr","msg_index":-1},
     "voice_input": "",
-    "last_voice_text": "",
 }
 for k,v in defs.items():
     if k not in st.session_state: st.session_state[k]=v
@@ -1591,264 +1590,502 @@ for i,msg in enumerate(st.session_state.messages):
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 
-# ── Reconnaissance vocale v9 — STYLE CHATGPT : frappe en temps réel ──
-_stt_lang_map = {"🇫🇷 Français":"fr-FR","🇩🇿 العربية":"ar-SA","🇬🇧 English":"en-US"}
-_stt_lang = _stt_lang_map.get(st.session_state.langue,"fr-FR")
+# ── Reconnaissance vocale ultra-réaliste ──
+_stt_lang_map = {"🇫🇷 Français": "fr-FR", "🇩🇿 العربية": "ar-SA", "🇬🇧 English": "en-US"}
+_stt_lang = _stt_lang_map.get(st.session_state.langue, "fr-FR")
 
-# ── Lire texte depuis composant (v12) OU query_params (fallback) ──
-_qp = st.query_params
-_vt = _qp.get("vt","").strip()
-_vs = "1"
-# Lire aussi la valeur retournée par setComponentValue (définie après le widget)
-if not _vt and "last_cmp_val" in st.session_state:
-    _cdata = st.session_state.get("last_cmp_val")
-    if isinstance(_cdata, dict) and _cdata.get("text","").strip():
-        _vt = _cdata["text"].strip()
-        st.session_state.last_cmp_val = None
-if _vt and _vt != st.session_state.get("last_voice_text",""):
-    st.session_state.input_value = _vt
-    st.session_state.last_voice_text = _vt
-    st.query_params.clear()
-    if _vs == "1":
-        _question = _vt
-        st.session_state.input_value = ""
-        st.session_state.last_voice_text = ""
-        st.session_state.messages.append({"role":"user","content":_question})
-        _rep,_res,_wres = process_msg(_question)
-        if _wres:
-            _wh='<div style="font-family:Orbitron,monospace;font-size:0.58rem;color:#00cc88;margin:4px 0;">🌐 SOURCES</div>'
-            for _wr in _wres[:3]:
-                if _wr.get("url"): _wh+=f'<div class="web-card">🔗 <a href="{_wr["url"]}" target="_blank" style="color:#00cc88;">{_wr["title"][:55]}</a></div>'
-            st.markdown(_wh, unsafe_allow_html=True)
-        st.session_state.mémoire.add_exchange(st.session_state.user_id,_question,_rep)
-        st.session_state.messages.append({"role":"assistant","content":_rep})
-        _is_song,_smood,_slang,_sverses = detect_song(_rep)
-        if _is_song and _sverses:
-            st.session_state.last_song={"verses":_sverses,"mood":_smood,"lang":_slang,"msg_index":len(st.session_state.messages)-1}
-        else:
-            play_reihana_voice(_rep, lang=detect_text_lang(_rep))
-        st.rerun()
-    else:
-        st.rerun()
-
-# ── Widget HTML complet v9 — textarea + MICRO + STOP + ENVOYER (style ChatGPT) ──
-_init_val = st.session_state.get("input_value","").replace("\\","\\\\").replace("`","\\`")
-import streamlit.components.v1 as _cmp
-_cmp_val = _cmp.html(f"""
-<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
+import streamlit.components.v1 as _stt_comp
+_stt_comp.html(f"""
 <style>
-*{{box-sizing:border-box;margin:0;padding:0;}}
-body{{background:transparent;font-family:'Orbitron',monospace;}}
-#rei-ta{{
-  width:100%;min-height:82px;max-height:160px;
-  background:rgba(0,15,35,0.9);
-  border:1.5px solid rgba(0,255,200,0.22);
-  border-radius:8px;color:#ddf8ff;
-  font-family:'Rajdhani',sans-serif;font-size:14px;
-  padding:10px 13px;resize:vertical;outline:none;
-  transition:border-color .2s, box-shadow .2s;
-  overflow-y:auto;
-}}
-#rei-ta:focus{{border-color:rgba(0,255,200,0.55);}}
-#rei-ta.rec{{border-color:#ff3333;box-shadow:0 0 10px rgba(255,51,51,0.25);}}
-#rei-ta::placeholder{{color:rgba(0,200,160,0.38);font-style:italic;}}
-#rei-bar{{display:flex;align-items:center;gap:7px;margin-top:6px;}}
-.rb{{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:1px;
-     padding:6px 13px;border-radius:6px;border:1px solid;cursor:pointer;
-     transition:all .15s;white-space:nowrap;background:transparent;}}
-#rb-mic{{border-color:rgba(0,255,200,0.45);color:#00ffcc;}}
-#rb-mic:hover{{background:rgba(0,255,200,0.12);}}
-#rb-mic.on{{border-color:#ff3333;color:#ff5555;animation:pm 1s infinite;}}
-@keyframes pm{{0%,100%{{box-shadow:0 0 3px rgba(255,50,50,.3)}}50%{{box-shadow:0 0 10px rgba(255,50,50,.7)}}}}
-#rb-stop{{border-color:rgba(255,160,0,.4);color:#ffaa00;}}
-#rb-stop:hover{{background:rgba(255,160,0,.1);}}
-#rb-send{{border-color:rgba(0,180,255,.5);color:#88ddff;margin-left:auto;padding:6px 18px;}}
-#rb-send:hover{{background:rgba(0,180,255,.15);}}
-#rei-st{{font-size:8px;letter-spacing:2px;color:rgba(0,255,200,.4);flex:1;
-         overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}}
-#rei-st.on{{color:#ff4444;}}
-#rei-st.ok{{color:#00ff88;}}
-#rei-st.err{{color:#ffaa00;}}
-#rei-wv{{display:flex;align-items:flex-end;gap:2px;height:14px;opacity:0;transition:opacity .3s;}}
-#rei-wv.on{{opacity:1;}}
-.rw{{width:3px;border-radius:2px;min-height:2px;
-     background:linear-gradient(0deg,#00ffcc,#8800ff);transition:height .06s;}}
+  body{{margin:0;padding:0;background:transparent;overflow:hidden;}}
+  
+  #reiMicZone{{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:4px 0;
+    font-family:'Orbitron',monospace;
+  }}
+  
+  #reiMicBtn{{
+    width:52px; height:52px;
+    border-radius:50%;
+    border:2px solid rgba(0,255,200,0.5);
+    background:linear-gradient(135deg,rgba(0,20,60,0.9),rgba(0,10,40,0.95));
+    color:#00ffcc;
+    font-size:22px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:all 0.3s ease;
+    box-shadow:0 0 12px rgba(0,255,200,0.2);
+    flex-shrink:0;
+    position:relative;
+  }}
+  #reiMicBtn:hover{{
+    background:linear-gradient(135deg,rgba(0,40,80,0.9),rgba(0,20,60,0.95));
+    box-shadow:0 0 20px rgba(0,255,200,0.5);
+    transform:scale(1.08);
+  }}
+  #reiMicBtn.listening{{
+    border-color:rgba(255,60,60,0.9);
+    color:#ff4444;
+    background:linear-gradient(135deg,rgba(60,0,0,0.9),rgba(40,0,0,0.95));
+    box-shadow:0 0 25px rgba(255,60,60,0.6);
+    animation:micPulse 0.8s ease-in-out infinite;
+  }}
+  #reiMicBtn.processing{{
+    border-color:rgba(255,200,0,0.9);
+    color:#ffcc00;
+    animation:micProcess 1s linear infinite;
+  }}
+  @keyframes micPulse{{
+    0%,100%{{box-shadow:0 0 15px rgba(255,60,60,0.4);transform:scale(1);}}
+    50%{{box-shadow:0 0 35px rgba(255,60,60,0.9);transform:scale(1.12);}}
+  }}
+  @keyframes micProcess{{
+    0%{{transform:rotate(0deg);}}
+    100%{{transform:rotate(360deg);}}
+  }}
+  
+  /* Anneau d'onde sonore autour du micro */
+  #reiMicRing{{
+    position:absolute;
+    width:52px; height:52px;
+    border-radius:50%;
+    border:2px solid rgba(255,60,60,0);
+    pointer-events:none;
+    transition:all 0.1s;
+  }}
+  #reiMicBtn.listening #reiMicRing{{
+    animation:ringExpand 1s ease-out infinite;
+  }}
+  @keyframes ringExpand{{
+    0%{{width:52px;height:52px;border-color:rgba(255,60,60,0.8);opacity:1;}}
+    100%{{width:90px;height:90px;margin:-19px;border-color:rgba(255,60,60,0);opacity:0;}}
+  }}
+  
+  #reiMicInfo{{
+    flex:1;
+    min-width:0;
+  }}
+  
+  #reiMicStatus{{
+    font-size:9px;
+    letter-spacing:2px;
+    color:rgba(0,255,200,0.5);
+    margin-bottom:3px;
+    height:14px;
+    transition:all 0.3s;
+  }}
+  #reiMicStatus.active{{color:#ff4444; animation:statusBlink 1s ease-in-out infinite;}}
+  #reiMicStatus.processing{{color:#ffcc00;}}
+  #reiMicStatus.success{{color:#00ff88;}}
+  @keyframes statusBlink{{0%,100%{{opacity:0.6;}}50%{{opacity:1;}}}}
+  
+  /* Transcription en temps réel */
+  #reiTranscript{{
+    font-size:11px;
+    color:#aaddff;
+    font-family:'Rajdhani',sans-serif;
+    letter-spacing:0.5px;
+    min-height:16px;
+    max-height:40px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    font-style:italic;
+    opacity:0.8;
+    transition:all 0.2s;
+  }}
+  
+  /* Visualiseur de niveau sonore */
+  #reiVolBars{{
+    display:flex;
+    align-items:flex-end;
+    gap:2px;
+    height:28px;
+    padding:4px 0;
+    opacity:0;
+    transition:opacity 0.3s;
+  }}
+  #reiVolBars.active{{opacity:1;}}
+  .reiVb{{
+    width:3px;
+    background:linear-gradient(0deg,#00ffcc,#7700ff);
+    border-radius:1.5px;
+    min-height:3px;
+    transition:height 0.05s ease;
+    box-shadow:0 0 3px rgba(0,255,200,0.5);
+  }}
 </style>
 
-<textarea id="rei-ta" placeholder="Écris ou parle à REIHANA... 👂">{_init_val}</textarea>
-
-<div id="rei-bar">
-  <button class="rb" id="rb-mic">🎙️ MICRO</button>
-  <button class="rb" id="rb-stop">⏹ STOP</button>
-  <span id="rei-st">🎙️ PRÊT</span>
-  <div id="rei-wv">
-    <div class="rw" style="height:2px"></div><div class="rw" style="height:5px"></div>
-    <div class="rw" style="height:9px"></div><div class="rw" style="height:13px"></div>
-    <div class="rw" style="height:14px"></div><div class="rw" style="height:13px"></div>
-    <div class="rw" style="height:9px"></div><div class="rw" style="height:5px"></div>
-    <div class="rw" style="height:2px"></div>
+<div id="reiMicZone">
+  <button id="reiMicBtn" onclick="toggleMic()" title="Cliquer pour parler">
+    <div id="reiMicRing"></div>
+    🎙️
+  </button>
+  <div id="reiMicInfo">
+    <div id="reiMicStatus">MICRO PRÊT</div>
+    <div id="reiTranscript">Cliquez sur 🎙️ pour parler à REIHANA...</div>
+    <div id="reiVolBars">
+      <div class="reiVb" style="height:4px" id="vb0"></div>
+      <div class="reiVb" style="height:8px" id="vb1"></div>
+      <div class="reiVb" style="height:14px" id="vb2"></div>
+      <div class="reiVb" style="height:18px" id="vb3"></div>
+      <div class="reiVb" style="height:22px" id="vb4"></div>
+      <div class="reiVb" style="height:18px" id="vb5"></div>
+      <div class="reiVb" style="height:14px" id="vb6"></div>
+      <div class="reiVb" style="height:8px" id="vb7"></div>
+      <div class="reiVb" style="height:4px" id="vb8"></div>
+    </div>
   </div>
-  <button class="rb" id="rb-send">📨 ENVOYER</button>
 </div>
 
 <script>
-(function(){{
-  // ══════════════════════════════════════════════════════
-  // SOLUTION IFRAME MICROPHONE :
-  // SpeechRecognition est bloqué dans les iframes sans
-  // l'attribut allow="microphone". On contourne en ajoutant
-  // cet attribut sur notre propre iframe dynamiquement.
-  // ══════════════════════════════════════════════════════
+var _recog = null;
+var _listening = false;
+var _analyser = null;
+var _animFrame = null;
+var _silenceTimer = null;
+var _finalText = "";
+var _sttLang = "{_stt_lang}";
 
-  // Ajouter allow="microphone" sur CETTE iframe dans le parent
-  (function fixMicPermission(){{
-    try {{
-      var frames = window.parent.document.querySelectorAll("iframe");
-      frames.forEach(function(f) {{
-        // Ajouter microphone à tous les iframes Streamlit
-        var cur = f.getAttribute("allow") || "";
-        if (cur.indexOf("microphone") === -1) {{
-          f.setAttribute("allow", (cur ? cur + "; " : "") + "microphone");
-        }}
-      }});
-    }} catch(e) {{}}
-  }})();
+var _btn = document.getElementById("reiMicBtn");
+var _status = document.getElementById("reiMicStatus");
+var _transcript = document.getElementById("reiTranscript");
+var _volBars = document.getElementById("reiVolBars");
+var _vbs = document.querySelectorAll(".reiVb");
 
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  var rec=null,on=false,allFin="",rafId=null,an=null;
-  var lang="{_stt_lang}";
-  var ta=document.getElementById("rei-ta");
-  var bMic=document.getElementById("rb-mic");
-  var bStp=document.getElementById("rb-stop");
-  var bSnd=document.getElementById("rb-send");
-  var sSt=document.getElementById("rei-st");
-  var wv=document.getElementById("rei-wv");
-  var def=[2,5,9,13,14,13,9,5,2];
+// ── Vérifier support ──
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(!SpeechRecognition){{
+  _status.innerText = "⚠️ NON SUPPORTÉ (Chrome requis)";
+  _btn.style.opacity = "0.3";
+  _btn.disabled = true;
+}}
 
-  function setSt(c,t){{sSt.className=c;sSt.innerText=t;}}
-
-  function startVis(){{
-    if(an)return;
-    navigator.mediaDevices.getUserMedia({{
-      audio:{{noiseSuppression:true,echoCancellation:true,autoGainControl:true}},video:false
-    }}).then(function(s){{
-      var ctx=new(window.AudioContext||window.webkitAudioContext)();
-      an=ctx.createAnalyser();an.fftSize=64;
-      ctx.createMediaStreamSource(s).connect(an);
-      var d=new Uint8Array(an.frequencyBinCount);
-      wv.classList.add("on");
-      (function draw(){{
-        if(!on){{
-          wv.classList.remove("on");
-          wv.querySelectorAll(".rw").forEach(function(b,i){{b.style.height=def[i]+"px";}});
-          an=null;return;
-        }}
-        rafId=requestAnimationFrame(draw);
-        an.getByteFrequencyData(d);
-        wv.querySelectorAll(".rw").forEach(function(b,i){{
-          b.style.height=Math.max(2,Math.min(14,d[Math.floor(i*d.length/9)]/6))+"px";
-        }});
-      }})();
-    }}).catch(function(e){{
-      setSt("err","🚫 Micro refusé: "+e.message);
-    }});
-  }}
-
-  function mkRec(){{
-    var r=new SR();
-    r.lang=lang;r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
-    r.onstart=function(){{
-      on=true;allFin="";
-      bMic.classList.add("on");
-      ta.classList.add("rec");
-      setSt("on","🔴 ÉCOUTE EN COURS...");
-      startVis();
-    }};
-    r.onresult=function(ev){{
-      var itr="";
-      for(var i=ev.resultIndex;i<ev.results.length;i++){{
-        if(ev.results[i].isFinal)allFin+=ev.results[i][0].transcript+" ";
-        else itr+=ev.results[i][0].transcript;
+// ── Visualiseur niveau sonore via AudioContext ──
+function startVisualizer(){{
+  navigator.mediaDevices.getUserMedia({{audio:true,video:false}}).then(function(stream){{
+    var ctx = new (window.AudioContext||window.webkitAudioContext)();
+    var src = ctx.createMediaStreamSource(stream);
+    _analyser = ctx.createAnalyser();
+    _analyser.fftSize = 256;
+    src.connect(_analyser);
+    var data = new Uint8Array(_analyser.frequencyBinCount);
+    
+    _volBars.classList.add("active");
+    
+    function drawBars(){{
+      if(!_listening){{
+        _volBars.classList.remove("active");
+        _vbs.forEach(function(b){{b.style.height="3px";}});
+        return;
       }}
-      // ✨ FRAPPE EN TEMPS RÉEL dans le textarea (même document = ça marche)
-      ta.value=(allFin+itr).trim();
-      ta.scrollTop=ta.scrollHeight;
-      setSt("on","🔴 "+(allFin+itr).trim().slice(-45));
-    }};
-    r.onerror=function(ev){{
-      var m={{
-        "not-allowed":"🚫 Cliquer 🔒 dans Chrome → Autoriser le micro",
-        "no-speech":"💬 Rien entendu — réessayez",
-        "network":"🌐 Erreur réseau",
-        "aborted":"⏹ Arrêté",
-        "service-not-allowed":"🚫 HTTPS requis ou micro bloqué"
-      }};
-      setSt("err",m[ev.error]||("⚠️ "+ev.error));
-      stopRec();
-    }};
-    r.onend=function(){{if(on){{try{{r.start();}}catch(x){{on=false;setSt("","🎙️ PRÊT");}}}}  }};
-    return r;
-  }}
-
-  function startRec(){{
-    if(!SR){{setSt("err","⚠️ Chrome ou Edge requis");return;}}
-    if(on)return;
-    // Re-appliquer la permission micro avant de démarrer
-    try{{
-      var frames=window.parent.document.querySelectorAll("iframe");
-      frames.forEach(function(f){{
-        var cur=f.getAttribute("allow")||"";
-        if(cur.indexOf("microphone")===-1)
-          f.setAttribute("allow",(cur?cur+"; ":"")+"microphone");
+      _animFrame = requestAnimationFrame(drawBars);
+      _analyser.getByteFrequencyData(data);
+      
+      var bands = [2,4,6,10,14,18,14,10,6];
+      bands.forEach(function(band, i){{
+        var sum = 0;
+        for(var j=0;j<band;j++) sum += data[Math.floor(j*data.length/band/9+i*data.length/9)];
+        var avg = sum/band;
+        var h = Math.max(3, Math.min(26, avg/4));
+        _vbs[i].style.height = h + "px";
       }});
-    }}catch(e){{}}
-    allFin="";rec=mkRec();
-    try{{rec.start();}}catch(e){{setSt("err","⚠️ "+e.message);}}
-  }}
-
-  function stopRec(){{
-    on=false;cancelAnimationFrame(rafId);
-    bMic.classList.remove("on");ta.classList.remove("rec");
-    if(rec){{try{{rec.stop();rec.abort();}}catch(e){{}}rec=null;}}
-    if(ta.value.trim())setSt("ok","✅ Texte prêt — cliquez 📨 ENVOYER");
-    else setSt("","🎙️ PRÊT");
-  }}
-
-  function sendMsg(){{
-    var t=ta.value.trim();
-    if(!t)return;
-    if(on)stopRec();
-    setSt("ok","📨 Envoi en cours...");
-    // ✅ v12 : Streamlit.setComponentValue — seule méthode fiable sur HTTPS/Render
-    try {{
-      Streamlit.setComponentValue({{text:t, ts:Date.now()}});
-    }} catch(e) {{
-      // fallback si Streamlit non dispo
-      window.parent.postMessage({{type:"reihana_send",text:t}},"*");
     }}
-  }}
-
-  bMic.onclick=startRec;
-  bStp.onclick=stopRec;
-  bSnd.onclick=sendMsg;
-  ta.addEventListener("keydown",function(e){{
-    if((e.ctrlKey||e.metaKey)&&e.key==="Enter"){{e.preventDefault();sendMsg();}}
+    drawBars();
+  }}).catch(function(){{
+    // Micro refusé - barres statiques
   }});
+}}
 
-  // Signaler à Streamlit que le composant est prêt
-  Streamlit.setFrameHeight(160);
-}})();
+// ── Créer reconnaissance ──
+function createRecognition(){{
+  if(!SpeechRecognition) return null;
+  var r = new SpeechRecognition();
+  r.lang = _sttLang;
+  r.continuous = true;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  
+  r.onstart = function(){{
+    _listening = true;
+    _btn.classList.add("listening");
+    _status.className = "active";
+    _status.innerText = "🔴 ÉCOUTE EN COURS...";
+    _transcript.innerText = "Je vous écoute...";
+    startVisualizer();
+    
+    // Signaler à l'avatar REIHANA qu'elle écoute
+    try{{
+      var av = window.parent.document.getElementById("reiBgAvatar");
+      if(av) av.style.filter = "drop-shadow(0 0 30px rgba(255,80,80,0.6))";
+    }}catch(e){{}}
+  }};
+  
+  r.onresult = function(e){{
+    var interim = "";
+    _finalText = "";
+    for(var i=e.resultIndex; i<e.results.length; i++){{
+      if(e.results[i].isFinal){{
+        _finalText += e.results[i][0].transcript + " ";
+      }} else {{
+        interim += e.results[i][0].transcript;
+      }}
+    }}
+    
+    var display = (_finalText + interim).trim();
+    _transcript.innerText = display || "...";
+    
+    // Envoyer texte intermédiaire au champ Streamlit via postMessage
+    if(display){{
+      window.parent.postMessage({{type:"reiSTT", text:display, final:_finalText.trim()!=""}}, "*");
+    }}
+    
+    // Réinitialiser timer silence (3 secondes sans parler → stop)
+    clearTimeout(_silenceTimer);
+    if(_finalText.trim()){{
+      _silenceTimer = setTimeout(function(){{
+        if(_listening && _finalText.trim()){{
+          stopMic(true); // true = envoyer automatiquement
+        }}
+      }}, 2800);
+    }}
+  }};
+  
+  r.onerror = function(e){{
+    _status.className = "";
+    if(e.error === "no-speech"){{
+      _status.innerText = "💬 AUCUN SON DÉTECTÉ";
+    }} else if(e.error === "not-allowed"){{
+      _status.innerText = "🚫 MICRO REFUSÉ";
+    }} else{{
+      _status.innerText = "⚠️ ERREUR: " + e.error;
+    }}
+    stopMic(false);
+  }};
+  
+  r.onend = function(){{
+    if(_listening){{
+      // Reconnexion auto si l'utilisateur parle encore
+      try{{ r.start(); }}catch(ex){{
+        _listening = false;
+        _btn.classList.remove("listening","processing");
+      }}
+    }}
+  }};
+  
+  return r;
+}}
+
+// ── Toggle micro ──
+function toggleMic(){{
+  if(_listening){{
+    stopMic(false);
+  }} else {{
+    startMic();
+  }}
+}}
+
+function startMic(){{
+  _finalText = "";
+  _recog = createRecognition();
+  if(!_recog) return;
+  try{{
+    _recog.start();
+  }}catch(e){{
+    _status.innerText = "⚠️ Impossible de démarrer";
+  }}
+}}
+
+function stopMic(autoSend){{
+  _listening = false;
+  clearTimeout(_silenceTimer);
+  cancelAnimationFrame(_animFrame);
+  _volBars.classList.remove("active");
+  _vbs.forEach(function(b){{b.style.height="3px";}});
+  
+  if(_recog){{
+    try{{ _recog.stop(); _recog.abort(); }}catch(e){{}}
+    _recog = null;
+  }}
+  
+  _btn.classList.remove("listening");
+  
+  // Restaurer avatar
+  try{{
+    var av = window.parent.document.getElementById("reiBgAvatar");
+    if(av) av.style.filter = "";
+  }}catch(e){{}}
+  
+  var txt = _finalText.trim();
+  if(txt){{
+    _btn.classList.add("processing");
+    _status.className = "processing";
+    _status.innerText = "⚙️ TRAITEMENT...";
+    _transcript.innerText = "\\"" + txt.substring(0,60) + (txt.length>60?"...":"") + "\\"";
+    
+    // Envoyer le texte final à Streamlit
+    window.parent.postMessage({{type:"reiSTT_FINAL", text:txt, autoSend:autoSend}}, "*");
+    
+    setTimeout(function(){{
+      _btn.classList.remove("processing");
+      _status.className = "success";
+      _status.innerText = "✅ MESSAGE ENVOYÉ";
+      setTimeout(function(){{
+        _status.className = "";
+        _status.innerText = "MICRO PRÊT";
+        _transcript.innerText = "Cliquez sur 🎙️ pour parler à REIHANA...";
+        _finalText = "";
+      }}, 2000);
+    }}, 1500);
+  }} else {{
+    _status.className = "";
+    _status.innerText = "MICRO PRÊT";
+    _transcript.innerText = "Cliquez sur 🎙️ pour parler à REIHANA...";
+  }}
+}}
+
+// ── Écouter les messages STT depuis l'iframe parente ──
+// (pour mettre à jour la langue si l'utilisateur change)
+window.addEventListener("message", function(e){{
+  if(e.data && e.data.type === "reiSetSttLang"){{
+    _sttLang = e.data.lang;
+    if(_recog) _recog.lang = _sttLang;
+  }}
+}});
 </script>
-""", height=160, scrolling=False)
+""", height=140)
 
-# ── Capturer valeur retournée par setComponentValue ──
-if _cmp_val is not None and isinstance(_cmp_val, dict) and _cmp_val.get("text","").strip():
-    st.session_state.last_cmp_val = _cmp_val
-    st.rerun()
+# ── Zone texte + boutons ──
+ci, cs2, cs3 = st.columns([5, 1, 1])
+with ci:
+    if st.session_state.clear_input:
+        st.session_state.input_value=""; st.session_state.clear_input=False; st.rerun()
+    user_input=st.text_area("",value=st.session_state.input_value,placeholder=T["placeholder"],key="uinput",height=80,label_visibility="collapsed")
+    st.session_state.input_value=user_input
+with cs2:
+    st.markdown("<br>", unsafe_allow_html=True)
+    send_btn=st.button(T["send"], use_container_width=True, key="sbtn")
+with cs3:
+    st.markdown("<br>", unsafe_allow_html=True)
+    # Bouton stop micro (visuel seulement - JS gère le vrai stop)
+    if st.button("🔇", use_container_width=True, key="micstop", help="Arrêter le micro"):
+        pass
 
-# Variables nécessaires pour la suite du code (regen etc.)
-user_input = st.session_state.get("input_value","")
-send_btn = False  # Tout passe par le bouton HTML ENVOYER via query_params
+# ── Script de liaison STT → champ Streamlit ──
+import streamlit.components.v1 as _bridge_comp
+_bridge_comp.html("""
+<script>
+// ── Fix permission microphone sur TOUS les iframes (Render/HTTPS) ──
+(function fixMicIframes() {
+  var frames = document.querySelectorAll("iframe");
+  frames.forEach(function(f) {
+    var cur = f.getAttribute("allow") || "";
+    if (cur.indexOf("microphone") === -1) {
+      f.setAttribute("allow", (cur ? cur + "; " : "") + "microphone; camera");
+    }
+  });
+  // Observer les nouveaux iframes ajoutés dynamiquement
+  var obs = new MutationObserver(function(muts) {
+    muts.forEach(function(m) {
+      m.addedNodes.forEach(function(n) {
+        if (n.tagName === "IFRAME") {
+          var cur = n.getAttribute("allow") || "";
+          if (cur.indexOf("microphone") === -1)
+            n.setAttribute("allow", (cur ? cur + "; " : "") + "microphone; camera");
+        }
+      });
+    });
+  });
+  obs.observe(document.body, {childList: true, subtree: true});
+})();
+
+// ── Écouter les messages postMessage de l'iframe STT ──
+window.addEventListener("message", function(e) {
+  if(!e.data || !e.data.type) return;
+  
+  if(e.data.type === "reiSTT_FINAL") {
+    var txt = e.data.text;
+    var autoSend = e.data.autoSend;
+    
+    // Injecter texte dans le textarea Streamlit (chercher dans le parent)
+    function injectText(targetDoc) {
+      var ta = targetDoc.querySelector('textarea[data-testid="stTextArea"]') ||
+               targetDoc.querySelector('textarea[aria-label]') ||
+               targetDoc.querySelector('textarea');
+      if(ta) {
+        var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(ta, txt);
+        ta.dispatchEvent(new Event('input', {bubbles:true}));
+        ta.dispatchEvent(new Event('change', {bubbles:true}));
+        ta.focus();
+        return true;
+      }
+      return false;
+    }
+    
+    var done = injectText(document);
+    
+    // Chercher aussi dans les iframes du parent si pas trouvé
+    if(!done) {
+      var iframes = document.querySelectorAll("iframe");
+      for(var i=0; i<iframes.length; i++) {
+        try {
+          if(injectText(iframes[i].contentDocument)) { done=true; break; }
+        } catch(ex) {}
+      }
+    }
+    
+    // Auto-envoi : cliquer bouton ENVOYER dans le parent ET dans les iframes
+    if(autoSend && done) {
+      setTimeout(function() {
+        function clickSend(doc) {
+          var btns = Array.from(doc.querySelectorAll('button'));
+          var sendBtn = btns.find(function(b) {
+            var t = (b.innerText || b.textContent || "").trim();
+            return t.includes('ENVOYER') || t.includes('SEND') || t.includes('إرسال') || t.includes('📨');
+          });
+          if(sendBtn) { sendBtn.click(); return true; }
+          return false;
+        }
+        if(!clickSend(document)) {
+          var iframes = document.querySelectorAll("iframe");
+          for(var i=0; i<iframes.length; i++) {
+            try { if(clickSend(iframes[i].contentDocument)) break; } catch(ex) {}
+          }
+        }
+      }, 600);
+    }
+  }
+  
+  if(e.data.type === "reiSTT") {
+    // Texte intermédiaire en temps réel
+    var txt = e.data.text;
+    function updateTA(doc) {
+      var ta = doc.querySelector('textarea[data-testid="stTextArea"]') ||
+               doc.querySelector('textarea');
+      if(!ta) return false;
+      if(e.data.final === false) {
+        ta.setAttribute('placeholder', '🎙️ ' + txt + '...');
+      } else if(txt) {
+        var setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(ta, txt);
+        ta.dispatchEvent(new Event('input', {bubbles:true}));
+      }
+      return true;
+    }
+    if(!updateTA(document)) {
+      var iframes = document.querySelectorAll("iframe");
+      for(var i=0; i<iframes.length; i++) {
+        try { if(updateTA(iframes[i].contentDocument)) break; } catch(ex) {}
+      }
+    }
+  }
+});
+</script>
+""", height=0)
 
 if st.session_state.regen_index is not None:
     idx=st.session_state.regen_index; q=st.session_state.regen_question
