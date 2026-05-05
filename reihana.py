@@ -5,6 +5,7 @@ Fondée par Khedim Benyakhlef (Biny-Joe)
 import streamlit as st
 import sys, os, json, time, tempfile, urllib.request, urllib.parse
 import base64
+import hashlib
 try:
     from gtts import gTTS
     GTTS_OK = True
