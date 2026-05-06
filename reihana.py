@@ -2373,151 +2373,484 @@ _av_known_str = ",".join(st.session_state.get("face_known_names", []))
 
 _av_html = f"""<html><head>
 <style>
-  body{{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}}
-  #avZone{{display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;}}
+  body{{margin:0;padding:4px;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}}
+  
+  /* ══ BARRE DE CONTRÔLES ══ */
+  #avZone{{display:flex;align-items:center;gap:8px;padding:4px 0 6px 0;flex-wrap:wrap;}}
   #avBtn{{width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,80,200,0.5);
     background:rgba(30,0,30,0.9);color:#ff55cc;font-size:20px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}}
   #avBtn.active{{border-color:#ff3399;animation:avPulse .8s infinite;}}
   #avCamBtn{{width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,200,255,0.4);
-    background:rgba(0,20,40,0.8);color:#00ccff;font-size:13px;cursor:pointer;flex-shrink:0;}}
+    background:rgba(0,20,40,0.8);color:#00ccff;font-size:13px;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;}}
+  #avEnrollBtn{{font-size:9px;border:1px solid rgba(0,255,150,0.5);background:rgba(0,40,20,0.8);
+    color:#00ff88;padding:4px 8px;border-radius:6px;cursor:pointer;letter-spacing:1px;}}
   @keyframes avPulse{{0%,100%{{box-shadow:0 0 10px rgba(255,50,150,.4);}}50%{{box-shadow:0 0 26px rgba(255,50,150,.9);}}}}
   #avStatus{{font-size:9px;letter-spacing:2px;color:rgba(255,80,200,0.5);}}
-  #avStatus.on{{color:#ff3399;}}
+  #avStatus.on{{color:#ff3399;animation:stPulse 1s ease-in-out infinite;}}
   #avStatus.ok{{color:#00ffcc;}}
-  #avInfo{{font-size:10px;color:rgba(220,150,255,0.7);font-family:Rajdhani,sans-serif;font-weight:600;max-width:200px;}}
-  #avVideo{{display:none;width:180px;height:120px;border-radius:8px;border:1px solid rgba(255,80,200,0.4);
-    margin-top:4px;object-fit:cover;transform:scaleX(-1);}}
-  #avVideo.rear{{transform:scaleX(1);}}
-  #avCanvas{{display:none;}}
+  @keyframes stPulse{{0%,100%{{opacity:0.7;}}50%{{opacity:1;}}}}
+  #avInfo{{font-size:10px;color:rgba(220,150,255,0.8);font-family:Rajdhani,sans-serif;font-weight:600;max-width:280px;line-height:1.4;}}
   #avMoodBar{{font-size:8px;color:rgba(255,150,255,0.5);margin-top:2px;letter-spacing:1px;}}
+  
+  /* ══ ÉCRAN DE VISUALISATION PRINCIPAL ══ */
+  #avScreen{{
+    display:none;
+    position:relative;
+    width:100%;
+    background:rgba(0,0,20,0.95);
+    border:1px solid rgba(255,80,200,0.5);
+    border-radius:12px;
+    overflow:hidden;
+    margin-top:6px;
+    box-shadow:0 0 20px rgba(255,50,150,0.3),inset 0 0 30px rgba(0,0,40,0.5);
+  }}
+  #avScreen.visible{{display:block;}}
+  #avVideo{{
+    width:100%;height:220px;
+    object-fit:cover;
+    display:block;
+    transform:scaleX(-1);
+    border-radius:0;
+  }}
+  #avVideo.rear{{transform:scaleX(1);}}
+  
+  /* ══ OVERLAY HOLOGRAPHIQUE SUR LA VIDÉO ══ */
+  #avOverlay{{
+    position:absolute;top:0;left:0;right:0;bottom:0;
+    pointer-events:none;z-index:5;
+  }}
+  /* Lignes de scan */
+  #avOverlay::before{{
+    content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 4px,rgba(0,255,200,0.03) 4px,rgba(0,255,200,0.03) 5px);
+    animation:scanAV 2s linear infinite;
+    pointer-events:none;
+  }}
+  @keyframes scanAV{{0%{{background-position:0 0;}}100%{{background-position:0 100px;}}}}
+  /* Coin décoratifs */
+  #avOverlay::after{{
+    content:'';position:absolute;top:6px;left:6px;width:28px;height:28px;
+    border-top:2px solid rgba(0,255,200,0.8);border-left:2px solid rgba(0,255,200,0.8);
+    border-radius:2px 0 0 0;pointer-events:none;
+  }}
+  .av-corner-br{{position:absolute;bottom:38px;right:6px;width:28px;height:28px;
+    border-bottom:2px solid rgba(255,80,200,0.8);border-right:2px solid rgba(255,80,200,0.8);
+    border-radius:0 0 2px 0;pointer-events:none;z-index:6;}}
+  
+  /* ══ CANVAS AVEC BOÎTES DE DÉTECTION ══ */
+  #avCanvas{{
+    position:absolute;top:0;left:0;width:100%;height:220px;
+    pointer-events:none;z-index:10;
+  }}
+  
+  /* ══ BADGE NOM DÉTECTÉ ══ */
+  #avNameBadge{{
+    position:absolute;bottom:40px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,30,0.9);border:1px solid rgba(0,255,200,0.6);
+    border-radius:8px;padding:4px 12px;font-size:11px;
+    color:#00ffcc;letter-spacing:2px;font-family:Orbitron,monospace;
+    text-align:center;white-space:nowrap;z-index:15;
+    display:none;box-shadow:0 0 12px rgba(0,255,200,0.4);
+  }}
+  #avNameBadge.unknown{{border-color:rgba(180,80,255,0.6);color:#cc88ff;box-shadow:0 0 12px rgba(150,0,255,0.3);}}
+  #avNameBadge.known{{border-color:rgba(0,255,150,0.8);color:#00ffcc;box-shadow:0 0 18px rgba(0,255,150,0.5);}}
+  
+  /* ══ BARRE D'INFO BAS DE VIDÉO ══ */
+  #avInfoBar{{
+    background:rgba(0,0,20,0.9);
+    padding:5px 10px;
+    display:flex;justify-content:space-between;align-items:center;
+    border-top:1px solid rgba(255,80,200,0.2);
+    font-size:9px;letter-spacing:1px;
+    font-family:Orbitron,monospace;
+  }}
+  #avInfoLeft{{color:rgba(0,255,200,0.7);}}
+  #avInfoRight{{color:rgba(255,80,200,0.7);}}
+  
+  /* ══ ZONE D'ENRÔLEMENT ══ */
+  #avEnrollZone{{
+    display:none;background:rgba(0,10,30,0.97);border:1px solid rgba(0,255,150,0.3);
+    border-radius:8px;padding:10px;margin-top:6px;
+  }}
+  #avEnrollZone input{{width:calc(100% - 14px);background:rgba(0,0,20,0.8);
+    border:1px solid rgba(0,255,150,0.3);color:#00ff88;font-size:10px;
+    padding:5px 7px;border-radius:4px;outline:none;font-family:Rajdhani,sans-serif;
+    margin-bottom:5px;display:block;}}
+  #avSaveBtn{{width:100%;font-size:9px;border:1px solid rgba(0,255,150,0.5);
+    background:rgba(0,40,20,0.8);color:#00ff88;padding:5px;border-radius:5px;
+    cursor:pointer;letter-spacing:1px;}}
+  #avKnownList{{font-size:9px;color:rgba(0,255,150,0.5);margin-top:5px;letter-spacing:1px;}}
+  
+  .fid-known{{color:#00ffcc;font-size:12px;font-weight:700;text-shadow:0 0 8px rgba(0,255,200,0.6);}}
+  .fid-unknown{{color:rgba(200,150,255,0.8);}}
 </style></head><body>
 <div id="avZone">
-  <button id="avBtn" onclick="toggleAV()" title="Chat Audio/Visuel — REIHANA voit et entend">👁️‍🗨️</button>
-  <button id="avCamBtn" onclick="switchAVCam()" title="Caméra av/ar">🔄</button>
-  <div>
-    <div id="avStatus">AUDIO/VISUEL PRÊT</div>
-    <div id="avInfo">Cliquez 👁️‍🗨️ — REIHANA voit + entend</div>
+  <button id="avBtn" onclick="toggleAV()" title="Activer la caméra — REIHANA vous voit et vous reconnaît">👁️‍🗨️</button>
+  <button id="avCamBtn" onclick="switchAVCam()" title="Caméra avant/arrière">🔄</button>
+  <button id="avEnrollBtn" onclick="toggleEnroll()">➕ ENRÔLER</button>
+  <div style="flex:1;">
+    <div id="avStatus">CAMÉRA PRÊTE</div>
+    <div id="avInfo">Cliquez 👁️‍🗨️ — REIHANA voit et reconnaît</div>
     <div id="avMoodBar"></div>
   </div>
 </div>
-<video id="avVideo" autoplay muted playsinline></video>
-<canvas id="avCanvas"></canvas>
+
+<!-- ══ ÉCRAN DE VISUALISATION ══ -->
+<div id="avScreen">
+  <div id="avOverlay"></div>
+  <div class="av-corner-br"></div>
+  <video id="avVideo" autoplay muted playsinline></video>
+  <canvas id="avCanvas"></canvas>
+  <div id="avNameBadge">❓ INCONNU</div>
+  <div id="avInfoBar">
+    <span id="avInfoLeft">👁️ SCAN ACTIF</span>
+    <span id="avInfoRight">cam: avant</span>
+  </div>
+</div>
+
+<!-- ══ ZONE D'ENRÔLEMENT ══ -->
+<div id="avEnrollZone">
+  <div style="font-size:9px;color:rgba(0,255,150,0.7);letter-spacing:2px;margin-bottom:5px;">📸 ENREGISTRER CE VISAGE</div>
+  <input id="avNameInput" placeholder="Nom complet de la personne..." maxlength="40"/>
+  <button id="avSaveBtn" onclick="enrollAVFace()">📸 CAPTURER & ENREGISTRER</button>
+  <div id="avKnownList">Personnes enregistrées : <span id="avKnownCount">0</span></div>
+</div>
+
 <script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 var _avActive=false,_avStream=null,_avFaceInt=null,_avRecog=null;
-var _avFacing='user'; // avant par défaut
+var _avFacing='user';
 var _avModelsLoaded=false;
+var _avRecogModelLoaded=false;
 var _avLang='{_av_lang}';
-var _avKnown=[]; // noms déjà connus depuis Python
+var _avKnown=[]; // {{name, descriptor:Float32Array, info:{{}}}}
 var _avLastName='';
+var _avDetectInterval=null;
+var _avCanvas2d=null;
+
 var avBtn=document.getElementById('avBtn');
 var avStatus=document.getElementById('avStatus');
 var avInfo=document.getElementById('avInfo');
 var avVideo=document.getElementById('avVideo');
 var avCanvas=document.getElementById('avCanvas');
 var avMoodBar=document.getElementById('avMoodBar');
+var avScreen=document.getElementById('avScreen');
+var avNameBadge=document.getElementById('avNameBadge');
+var avInfoLeft=document.getElementById('avInfoLeft');
+var avInfoRight=document.getElementById('avInfoRight');
 
-// Charger base de visages localStorage
+// ══ BASE DE DONNÉES ADMINISTRATIVE INTÉGRÉE ══
+// Structure enrichie: nom, poste, département, niveau d'accès, RDV
+var _adminDB = {{
+  // Exemple de structure — sera enrichi via enrôlement
+  // "Jean Dupont": {{ post:"Directeur", dept:"Administration", access:3, rdv:[] }}
+}};
+
+function loadAdminDB(){{
+  try{{
+    var s=localStorage.getItem('rei_admin_db');
+    if(s) _adminDB=JSON.parse(s);
+  }}catch(e){{}}
+}}
+
+function saveAdminDB(){{
+  try{{localStorage.setItem('rei_admin_db',JSON.stringify(_adminDB));}}catch(e){{}}
+}}
+
+function getPersonInfo(name){{
+  return _adminDB[name] || null;
+}}
+
+// ══ CHARGER LES VISAGES CONNUS (avec descripteurs) ══
 function loadAVFaces(){{
   try{{
     var s=localStorage.getItem('rei_known_faces');
     if(s){{
       var arr=JSON.parse(s);
-      _avKnown=arr.map(function(f){{return {{name:f.name,descriptor:new Float32Array(f.descriptor)}}}});
+      _avKnown=arr.map(function(f){{
+        return {{name:f.name,descriptor:new Float32Array(f.descriptor),info:f.info||{{}}}};
+      }});
     }}
   }}catch(e){{}}
-  // Ajouter ceux transmis par Python (noms seulement, pour affichage)
+  // Fusionner noms venant de Python
   var fromPy='{_av_known_str}'.split(',').filter(function(n){{return n.trim();}});
   fromPy.forEach(function(n){{
-    if(!_avKnown.find(function(f){{return f.name===n;}})) _avKnown.push({{name:n,descriptor:null}});
+    if(!_avKnown.find(function(f){{return f.name===n;}}))
+      _avKnown.push({{name:n,descriptor:null,info:{{}}}});
   }});
+  document.getElementById('avKnownCount').innerText=_avKnown.filter(function(f){{return f.descriptor;}}).length;
 }}
 
-function identifyAV(desc){{
-  if(!desc) return null;
-  var best=null,bestD=0.52;
+function saveAVFaces(){{
+  try{{
+    var toSave=_avKnown.filter(function(f){{return f.descriptor;}}).map(function(f){{
+      return {{name:f.name,descriptor:Array.from(f.descriptor),info:f.info||{{}}}};
+    }});
+    localStorage.setItem('rei_known_faces',JSON.stringify(toSave));
+  }}catch(e){{}}
+  document.getElementById('avKnownCount').innerText=_avKnown.filter(function(f){{return f.descriptor;}}).length;
+}}
+
+// ══ IDENTIFICATION FACIALE ══
+function identifyAV(descriptor){{
+  if(!descriptor||_avKnown.length===0) return null;
+  var best=null,bestDist=0.50; // seuil strict pour précision maximale
   _avKnown.forEach(function(kf){{
     if(!kf.descriptor) return;
-    var d=faceapi.euclideanDistance(desc,kf.descriptor);
-    if(d<bestD){{bestD=d;best=kf.name;}}
+    var d=faceapi.euclideanDistance(descriptor,kf.descriptor);
+    if(d<bestDist){{bestDist=d;best=kf.name;}}
   }});
   return best;
 }}
 
+// ══ CHARGER LES MODÈLES (avec faceRecognitionNet pour vraie identification) ══
 async function loadAVModels(){{
   if(_avModelsLoaded) return;
-  avStatus.innerText='⏳ CHARGEMENT...';
+  avStatus.innerText='⏳ MODÈLES IA...';
+  avInfo.innerText='Chargement reconnaissance faciale...';
   var W='https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
-  await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri(W),
-    faceapi.nets.faceExpressionNet.loadFromUri(W),
-    faceapi.nets.ageGenderNet.loadFromUri(W)
-  ]);
-  _avModelsLoaded=true;
+  try{{
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(W),
+      faceapi.nets.faceExpressionNet.loadFromUri(W),
+      faceapi.nets.ageGenderNet.loadFromUri(W),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(W),
+      faceapi.nets.faceRecognitionNet.loadFromUri(W)  // ✅ Vraie reconnaissance
+    ]);
+    _avModelsLoaded=true;
+    _avRecogModelLoaded=true;
+    avStatus.innerText='✅ MODÈLES CHARGÉS';
+    avInfo.innerText='Reconnaissance faciale prête !';
+  }}catch(err){{
+    // Fallback sans reconnaissance
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(W),
+      faceapi.nets.faceExpressionNet.loadFromUri(W),
+      faceapi.nets.ageGenderNet.loadFromUri(W)
+    ]);
+    _avModelsLoaded=true;
+    _avRecogModelLoaded=false;
+  }}
+}}
+
+// ══ DESSINER LES BOÎTES DE DÉTECTION SUR LE CANVAS ══
+function drawDetections(det, name, isKnown){{
+  if(!_avCanvas2d||!det) return;
+  var vw=avVideo.videoWidth||avCanvas.width;
+  var vh=avVideo.videoHeight||avCanvas.height;
+  avCanvas.width=avCanvas.offsetWidth||avCanvas.width;
+  avCanvas.height=220;
+  var scaleX=avCanvas.width/vw;
+  var scaleY=avCanvas.height/vh;
+  
+  _avCanvas2d.clearRect(0,0,avCanvas.width,avCanvas.height);
+  
+  var box=det.detection.box;
+  var x=box.x*scaleX, y=box.y*scaleY;
+  var w=box.width*scaleX, h=box.height*scaleY;
+  
+  // Couleur selon identification
+  var color=isKnown?'rgba(0,255,200,0.9)':'rgba(180,80,255,0.9)';
+  var colorFill=isKnown?'rgba(0,255,200,0.1)':'rgba(180,80,255,0.08)';
+  
+  // Rectangle principal
+  _avCanvas2d.strokeStyle=color;
+  _avCanvas2d.lineWidth=2;
+  _avCanvas2d.strokeRect(x,y,w,h);
+  _avCanvas2d.fillStyle=colorFill;
+  _avCanvas2d.fillRect(x,y,w,h);
+  
+  // Coins stylisés
+  var cs=14;
+  _avCanvas2d.strokeStyle=isKnown?'rgba(0,255,150,1)':'rgba(255,100,255,1)';
+  _avCanvas2d.lineWidth=3;
+  // Coin haut-gauche
+  _avCanvas2d.beginPath();_avCanvas2d.moveTo(x,y+cs);_avCanvas2d.lineTo(x,y);_avCanvas2d.lineTo(x+cs,y);_avCanvas2d.stroke();
+  // Coin haut-droit
+  _avCanvas2d.beginPath();_avCanvas2d.moveTo(x+w-cs,y);_avCanvas2d.lineTo(x+w,y);_avCanvas2d.lineTo(x+w,y+cs);_avCanvas2d.stroke();
+  // Coin bas-gauche
+  _avCanvas2d.beginPath();_avCanvas2d.moveTo(x,y+h-cs);_avCanvas2d.lineTo(x,y+h);_avCanvas2d.lineTo(x+cs,y+h);_avCanvas2d.stroke();
+  // Coin bas-droit
+  _avCanvas2d.beginPath();_avCanvas2d.moveTo(x+w-cs,y+h);_avCanvas2d.lineTo(x+w,y+h);_avCanvas2d.lineTo(x+w,y+h-cs);_avCanvas2d.stroke();
+  
+  // Label nom
+  var label=name||(isKnown?'✅ RECONNU':'❓ INCONNU');
+  _avCanvas2d.font='bold 11px Orbitron,monospace';
+  var tw=_avCanvas2d.measureText(label).width;
+  var lx=x+(w-tw)/2, ly=y-8;
+  if(ly<14) ly=y+h+18;
+  _avCanvas2d.fillStyle=isKnown?'rgba(0,40,30,0.9)':'rgba(20,0,40,0.9)';
+  _avCanvas2d.fillRect(lx-5,ly-13,tw+10,18);
+  _avCanvas2d.strokeStyle=color;_avCanvas2d.lineWidth=1;
+  _avCanvas2d.strokeRect(lx-5,ly-13,tw+10,18);
+  _avCanvas2d.fillStyle=color;
+  _avCanvas2d.fillText(label,lx,ly);
 }}
 
 function switchAVCam(){{
   _avFacing=(_avFacing==='user')?'environment':'user';
   avVideo.className=_avFacing==='environment'?'rear':'';
+  document.getElementById('avInfoRight').innerText='cam: '+(_avFacing==='user'?'avant':'arrière');
   if(_avActive){{stopAV();startAV();}}
 }}
 
 function toggleAV(){{if(_avActive)stopAV();else startAV();}}
+function toggleEnroll(){{
+  var ez=document.getElementById('avEnrollZone');
+  ez.style.display=ez.style.display==='block'?'none':'block';
+}}
+
+async function enrollAVFace(){{
+  var nameInput=document.getElementById('avNameInput');
+  var name=nameInput.value.trim();
+  if(!name){{alert('Entrez un nom !');return;}}
+  if(!_avActive||!avVideo.srcObject){{alert('Activez la caméra d\'abord !');return;}}
+  
+  try{{
+    var det=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks(true).withFaceDescriptor();
+    if(!det){{avInfo.innerHTML='<span style="color:#ff8800;">⚠️ Aucun visage visible</span>';return;}}
+    
+    // Sauvegarder le descripteur
+    var existing=_avKnown.findIndex(function(f){{return f.name===name;}});
+    var info=getPersonInfo(name)||{{}};
+    if(existing>=0){{
+      _avKnown[existing].descriptor=det.descriptor;
+      _avKnown[existing].info=info;
+    }}else{{
+      _avKnown.push({{name:name,descriptor:det.descriptor,info:info}});
+    }}
+    saveAVFaces();
+    
+    // Ajouter dans DB admin si absent
+    if(!_adminDB[name]){{
+      _adminDB[name]={{post:'',dept:'',access:1,rdv:[],enroled:new Date().toISOString()}};
+      saveAdminDB();
+    }}
+    
+    // Notifier Python
+    try{{
+      var url=window.location.href.split("?")[0]+"?face_enrolled="+encodeURIComponent(name);
+      window.parent.location.href=url;
+    }}catch(e){{
+      window.location.href=window.location.href.split("?")[0]+"?face_enrolled="+encodeURIComponent(name);
+    }}
+    
+    nameInput.value='';
+    avInfo.innerHTML='<span style="color:#00ffcc;">✅ '+name+' enregistré !</span>';
+    document.getElementById('avEnrollZone').style.display='none';
+  }}catch(e){{
+    avInfo.innerHTML='<span style="color:#ff5555;">❌ Erreur: '+e.message+'</span>';
+  }}
+}}
 
 async function startAV(){{
   try{{
     loadAVFaces();
+    loadAdminDB();
+    avStatus.innerText='⏳ DÉMARRAGE...';
     await loadAVModels();
-    // ── Démarrer caméra ──
-    var constraints={{video:{{facingMode:_avFacing,width:320,height:240}},audio:false}};
+    
+    var constraints={{video:{{facingMode:_avFacing,width:{{ideal:640}},height:{{ideal:480}}}},audio:false}};
     _avStream=await navigator.mediaDevices.getUserMedia(constraints);
     avVideo.srcObject=_avStream;
     avVideo.style.display='block';
+    avScreen.classList.add('visible');
+    
+    // Initialiser canvas 2D
+    _avCanvas2d=avCanvas.getContext('2d');
+    
     _avActive=true;
     avBtn.classList.add('active');
     avBtn.innerText='⏹';
-    avStatus.innerText='🎥 VU + ÉCOUTÉ';
+    avStatus.innerText='🎥 SCAN ACTIF';
     avStatus.className='on';
-    avInfo.innerText='REIHANA voit... parlez !';
+    avInfo.innerHTML='<span style="color:rgba(200,255,220,0.7);">Positionnez votre visage devant la caméra</span>';
+    avInfoRight.innerText='cam: '+(_avFacing==='user'?'avant':'arrière');
     
-    // ── Démarrer détection visage en continu ──
-    _avFaceInt=setInterval(async function(){{
-      if(!avVideo||!_avActive) return;
+    // ══ BOUCLE DE DÉTECTION FACIALE CONTINUE ══
+    _avDetectInterval=setInterval(async function(){{
+      if(!avVideo||!_avActive||avVideo.readyState<2) return;
       try{{
-        var det=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions())
-          .withFaceExpressions().withAgeAndGender();
-        if(det){{
-          var name=null; // identification par descripteur désactivée
-          var age=Math.round(det.age);
-          var exprs=det.expressions;
+        var detResult;
+        if(_avRecogModelLoaded){{
+          // Détection complète avec reconnaissance
+          detResult=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions({{scoreThreshold:0.4}}))
+            .withFaceLandmarks(true)
+            .withFaceDescriptor()
+            .withFaceExpressions()
+            .withAgeAndGender();
+        }}else{{
+          detResult=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions())
+            .withFaceExpressions()
+            .withAgeAndGender();
+        }}
+        
+        if(detResult){{
+          var age=Math.round(detResult.age);
+          var gender=detResult.gender==='male'?'H':'F';
+          var exprs=detResult.expressions;
           var topExpr=Object.entries(exprs).sort(function(a,b){{return b[1]-a[1];}})[0][0];
           var exprEm={{happy:'😊',sad:'😢',angry:'😠',fearful:'😨',disgusted:'🤢',surprised:'😲',neutral:'😐'}};
-          var nameLabel=name||'?';
           
-          avInfo.innerHTML=(name?'<span style="color:#00ffcc;">✅ '+name+'</span>':'<span style="color:#cc88ff;">❓ Inconnu</span>')
-            +' · '+age+'ans · '+(exprEm[topExpr]||topExpr);
-          avMoodBar.innerText='👁️ DÉTECTÉ · cam:'+ (_avFacing==='user'?'avant':'arrière');
+          // Identification
+          var name=null;
+          if(_avRecogModelLoaded&&detResult.descriptor){{
+            name=identifyAV(detResult.descriptor);
+          }}
           
-          // Notifier Python si nouveau visage identifié
-          if(name && name!==_avLastName){{
+          var isKnown=!!name;
+          
+          // Mettre à jour badge
+          avNameBadge.style.display='block';
+          if(isKnown){{
+            var info=getPersonInfo(name)||{{}};
+            var infoStr=info.post?(' · '+info.post):'';
+            avNameBadge.className='known';
+            avNameBadge.innerHTML='✅ '+name+(infoStr?'<br><span style="font-size:8px;color:rgba(0,255,150,0.6);">'+infoStr+'</span>':'');
+            avInfo.innerHTML='<span class="fid-known">✅ '+name+'</span> · '+gender+age+' · '+(exprEm[topExpr]||topExpr);
+          }}else{{
+            avNameBadge.className='unknown';
+            avNameBadge.innerHTML='❓ INCONNU · '+gender+' ~'+age+'ans';
+            avInfo.innerHTML='<span class="fid-unknown">❓ Inconnu</span> · '+gender+age+' · '+(exprEm[topExpr]||topExpr);
+          }}
+          
+          // Dessiner boîte de détection
+          drawDetections(detResult, name, isKnown);
+          
+          avInfoLeft.innerHTML='👁️ DÉTECTÉ · '+(exprEm[topExpr]||topExpr);
+          avMoodBar.innerText=_avRecogModelLoaded?'🧠 RECONNAISSANCE ACTIVE':'⚡ DÉTECTION BASIQUE';
+          
+          // Notifier Python si nouveau visage connu identifié
+          if(name&&name!==_avLastName){{
             _avLastName=name;
             try{{
               var url=window.location.href.split("?")[0]
-                +"?face_detected=1&face_age="+age+"&face_gender="+(det.gender==='male'?'Homme':'Femme')
-                +"&face_expr="+topExpr+"&face_name="+encodeURIComponent(name)
+                +"?face_detected=1&face_age="+age
+                +"&face_gender="+(detResult.gender==='male'?'Homme':'Femme')
+                +"&face_expr="+topExpr
+                +"&face_name="+encodeURIComponent(name)
                 +"&face_cam="+_avFacing;
               window.parent.history.replaceState(null,'',url);
             }}catch(e){{}}
           }}
         }}else{{
-          avInfo.innerText='Aucun visage détecté... parlez !';
+          // Aucun visage
+          if(_avCanvas2d) _avCanvas2d.clearRect(0,0,avCanvas.width,avCanvas.height);
+          avNameBadge.style.display='none';
+          avInfo.innerHTML='<span style="color:rgba(180,150,255,0.5);">Aucun visage détecté...</span>';
+          avInfoLeft.innerText='👁️ EN ATTENTE';
           avMoodBar.innerText='';
+          _avLastName='';
         }}
-      }}catch(e){{}}
-    }},1500);
+      }}catch(e){{
+        // Erreur silencieuse
+      }}
+    }},800); // Détection toutes les 800ms
     
-    // ── Démarrer reconnaissance vocale en continu ──
+    // ── Démarrer reconnaissance vocale ──
     startAVSpeech();
     
   }}catch(e){{
@@ -2568,23 +2901,28 @@ function startAVSpeech(){{
 
 function stopAV(){{
   _avActive=false;
-  clearInterval(_avFaceInt);
+  clearInterval(_avDetectInterval);
+  _avDetectInterval=null;
+  if(_avCanvas2d) _avCanvas2d.clearRect(0,0,avCanvas.width,avCanvas.height);
   if(_avStream)_avStream.getTracks().forEach(function(t){{t.stop();}});
   _avStream=null;
   if(_avRecog){{try{{_avRecog.stop();}}catch(e){{}}}}
   avVideo.style.display='none';
+  avScreen.classList.remove('visible');
+  avNameBadge.style.display='none';
   avBtn.classList.remove('active');
   avBtn.innerText='👁️‍🗨️';
   avStatus.className='';
-  avStatus.innerText='AUDIO/VISUEL PRÊT';
-  avInfo.innerText='Cliquez 👁️‍🗨️ — REIHANA voit + entend';
+  avStatus.innerText='CAMÉRA PRÊTE';
+  avInfo.innerHTML='Cliquez 👁️‍🗨️ — REIHANA voit et reconnaît';
   avMoodBar.innerText='';
+  avInfoLeft.innerText='👁️ SCAN ACTIF';
   _avLastName='';
 }}
 loadAVFaces();
 </script></body></html>"""
 
-_av_comp.html(_av_html, height=85)
+_av_comp.html(_av_html, height=320)
 
 # ── Reconnaissance vocale — Web Speech API avec allow="microphone" ──
 import streamlit.components.v1 as _comp_v1
@@ -2800,7 +3138,8 @@ function stopRecog() {{
 }}
 </script></body></html>"""
 
-_comp_v1.html(_stt_html, height=70)
+# ── Ancien widget micro (remplacé par le micro intégré dans la barre de saisie) ──
+# _comp_v1.html(_stt_html, height=70)  # DÉSACTIVÉ — micro déplacé dans la barre de saisie
 
 # ── Bloc mort (gardé pour éviter erreurs de syntaxe) ──
 if False:
@@ -3018,12 +3357,126 @@ window.addEventListener("message", function(e) {{
     FIN_BLOC_SUPPRIME"""
 
 
-# ── Zone texte + boutons ──
-ci, cs2, cs3 = st.columns([5, 1, 1])
+# ── Zone texte + boutons (micro intégré dans la ligne, ne cache plus l'écran) ──
+# Layout : [Micro compact | Zone texte | Envoyer | Stop]
+ci_mic, ci, cs2, cs3 = st.columns([1, 5, 1, 1])
+
+with ci_mic:
+    # Micro compact — placé à GAUCHE de la zone texte
+    _mic_inline_html = f"""<html><head>
+<style>
+  body{{margin:0;padding:2px;background:transparent;overflow:hidden;}}
+  #mBtnWrap{{display:flex;flex-direction:column;align-items:center;justify-content:center;height:88px;gap:4px;}}
+  #mBtn{{width:46px;height:46px;border-radius:50%;border:2px solid rgba(0,255,200,0.5);
+    background:rgba(0,20,40,0.95);color:#00ffcc;font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .2s;
+    box-shadow:0 0 12px rgba(0,255,200,0.2);}}
+  #mBtn.listening{{border-color:#ff3333;color:#ff5555;background:rgba(40,0,0,0.9);
+    animation:mPulse 0.7s ease-in-out infinite;}}
+  #mBtn.ok{{border-color:#00ff88;color:#00ff88;}}
+  @keyframes mPulse{{0%,100%{{box-shadow:0 0 8px rgba(255,50,50,.3);}}50%{{box-shadow:0 0 22px rgba(255,50,50,.8);}}}}
+  #mSt{{font-size:8px;color:rgba(0,255,200,0.5);letter-spacing:1px;font-family:Orbitron,monospace;
+    text-align:center;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}}
+  #mSt.active{{color:#ff4444;}}
+  #mSt.ok{{color:#00ff88;}}
+  #mBars{{display:flex;align-items:flex-end;gap:1px;height:14px;opacity:0;transition:opacity .2s;}}
+  #mBars.on{{opacity:1;}}
+  .mb{{width:3px;background:linear-gradient(0deg,#00ffcc,#7700ff);border-radius:1px;min-height:2px;}}
+</style></head><body>
+<div id="mBtnWrap">
+  <button id="mBtn" onclick="tMic()" title="Cliquez pour parler à REIHANA">🎙️</button>
+  <div id="mBars">
+    <div class="mb" style="height:3px"></div><div class="mb" style="height:7px"></div>
+    <div class="mb" style="height:12px"></div><div class="mb" style="height:7px"></div>
+    <div class="mb" style="height:3px"></div>
+  </div>
+  <div id="mSt">MICRO</div>
+</div>
+<script>
+var _lang="{_stt_lang_bcp}";
+var _btn=document.getElementById("mBtn");
+var _st=document.getElementById("mSt");
+var _bars=document.getElementById("mBars");
+var _mbs=document.querySelectorAll(".mb");
+var _recog=null;
+var _on=false;
+var _anim=null;
+var _retries=0;
+
+(function pI(){{
+  try{{
+    var ifs=window.parent.document.querySelectorAll("iframe");
+    ifs.forEach(function(f){{
+      var a=f.getAttribute("allow")||"";
+      if(!a.includes("microphone")) f.setAttribute("allow",a?a+"; microphone":"microphone");
+    }});
+  }}catch(e){{}}
+  setTimeout(pI,3000);
+}})();
+
+function setSt(cls,txt){{_st.className=cls;_st.innerText=txt;}}
+
+function anim(on){{
+  _bars.classList.toggle("on",on);
+  if(_anim) clearInterval(_anim);
+  if(on){{
+    _anim=setInterval(function(){{
+      _mbs.forEach(function(b){{b.style.height=Math.max(2,Math.floor(Math.random()*12)+2)+"px";}});
+    }},100);
+  }}else{{_mbs.forEach(function(b){{b.style.height="2px";}});}}
+}}
+
+function send(txt){{
+  var base=window.location.href.split("?")[0];
+  try{{window.parent.location.href=base+"?stt_text="+encodeURIComponent(txt);}}
+  catch(e){{window.location.href=base+"?stt_text="+encodeURIComponent(txt);}}
+}}
+
+function tMic(){{if(_on) stop(); else start();}}
+
+function start(){{
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){{setSt("err","Chrome");return;}}
+  if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){{
+    navigator.mediaDevices.getUserMedia({{audio:true}})
+      .then(function(s){{s.getTracks().forEach(function(t){{t.stop();}});launch(SR);}})
+      .catch(function(){{setSt("","🚫");}});
+  }}else launch(SR);
+}}
+
+function launch(SR){{
+  _recog=new SR();
+  _recog.lang=_lang;
+  _recog.continuous=false;
+  _recog.interimResults=true;
+  _recog.maxAlternatives=1;
+  _recog.onstart=function(){{_on=true;_retries=0;_btn.className="listening";_btn.innerText="⏹";setSt("active","🔴");anim(true);}};
+  _recog.onresult=function(e){{
+    var fin="";
+    for(var i=e.resultIndex;i<e.results.length;i++){{if(e.results[i].isFinal)fin+=e.results[i][0].transcript;}}
+    if(fin){{setSt("ok","✅");_btn.className="ok";_btn.innerText="🎙️";_on=false;anim(false);setTimeout(function(){{send(fin.trim());}},400);}}
+  }};
+  _recog.onerror=function(e){{
+    anim(false);_btn.className="";_btn.innerText="🎙️";_on=false;
+    if(e.error==="network"&&_retries<2){{_retries++;setSt("","↺");setTimeout(start,1500);}}
+    else setSt("","❌");
+  }};
+  _recog.onend=function(){{if(_on){{_on=false;_btn.className="";_btn.innerText="🎙️";anim(false);setSt("","MICRO");}}}};
+  try{{_recog.start();}}catch(ex){{setSt("","❌");}}
+}}
+
+function stop(){{
+  _on=false;
+  if(_recog){{try{{_recog.stop();}}catch(e){{}}}}
+  _btn.className="";_btn.innerText="🎙️";anim(false);setSt("","MICRO");
+}}
+</script></body></html>"""
+    import streamlit.components.v1 as _mic_inline_comp
+    _mic_inline_comp.html(_mic_inline_html, height=92)
+
 with ci:
     if st.session_state.clear_input:
         st.session_state.input_value=""; st.session_state.clear_input=False; st.rerun()
-    # Afficher notification si Whisper vient de transcrire
     if st.session_state.get("whisper_ready"):
         st.session_state.whisper_ready = False
     user_input=st.text_area("",value=st.session_state.input_value,placeholder=T["placeholder"],key="uinput",height=80,label_visibility="collapsed")
@@ -3033,7 +3486,6 @@ with cs2:
     send_btn=st.button(T["send"], use_container_width=True, key="sbtn")
 with cs3:
     st.markdown("<br>", unsafe_allow_html=True)
-    # Bouton stop micro (visuel seulement - JS gère le vrai stop)
     if st.button("🔇", use_container_width=True, key="micstop", help="Arrêter le micro"):
         pass
 
