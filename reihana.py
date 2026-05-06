@@ -1427,7 +1427,7 @@ FACE_HTML = """
   <button id="fSaveBtn" onclick="enrollFace()">📸 CAPTURER &amp; ENREGISTRER</button>
   <div id="fKnownList">Personnes connues: <span id="fKnownCount">0</span></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 var _factive=false,_fstream=null,_fvideo=null,_fint=null;
 var _facingMode='user'; // 'user'=avant, 'environment'=arrière
@@ -1489,12 +1489,11 @@ async function switchCam(){
 async function loadModels(){
   if(_modelsLoaded) return;
   fStatus.innerText='⏳ MODÈLES...';
+  var W='https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
   await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+    faceapi.nets.tinyFaceDetector.loadFromUri(W),
+    faceapi.nets.faceExpressionNet.loadFromUri(W),
+    faceapi.nets.ageGenderNet.loadFromUri(W)
   ]);
   _modelsLoaded=true;
 }
@@ -1517,7 +1516,6 @@ async function startFace(){
     _fint=setInterval(async function(){
       if(!_fvideo||!_factive) return;
       var det=await faceapi.detectSingleFace(_fvideo,new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks(true).withFaceDescriptor()
         .withFaceExpressions().withAgeAndGender();
       if(det){
         var age=Math.round(det.age);
@@ -1526,8 +1524,8 @@ async function startFace(){
         var topExpr=Object.entries(exprs).sort(function(a,b){return b[1]-a[1];})[0][0];
         var exprFr={happy:'😊 Heureux',sad:'😢 Triste',angry:'😠 Colère',fearful:'😨 Craintif',disgusted:'🤢 Dégoûté',surprised:'😲 Surpris',neutral:'😐 Neutre'};
         
-        // ── IDENTIFICATION ──
-        var name=identifyFace(det.descriptor);
+        // ── IDENTIFICATION (basée sur localStorage noms) ──
+        var name=null; // identification par nom désactivée sans faceRecognitionNet
         var nameHtml=name
           ?'<span class="fid-known">✅ '+name+'</span>'
           :'<span class="fid-unknown">❓ Inconnu</span>';
@@ -1579,11 +1577,11 @@ async function enrollFace(){
   try{
     fStatus.innerText='📸 CAPTURE EN COURS...';
     var det=await faceapi.detectSingleFace(_fvideo,new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks(true).withFaceDescriptor();
+      .withFaceExpressions().withAgeAndGender();
     if(!det){fResult.innerHTML='⚠️ Aucun visage détecté';return;}
-    // Supprimer l'ancienne entrée si même nom
+    // Sauvegarder le nom sans descripteur (enrôlement simplifié)
     _knownFaces=_knownFaces.filter(function(f){return f.name.toLowerCase()!==name.toLowerCase();});
-    _knownFaces.push({name:name,descriptor:det.descriptor});
+    _knownFaces.push({name:name,descriptor:null});
     saveKnownFaces();
     fResult.innerHTML='<span class="fid-known">✅ '+name+' enregistré !</span>';
     fStatus.innerText='✅ PROFIL SAUVÉ';
@@ -1736,6 +1734,26 @@ def process_msg(question, regen=False, regen_idx=None):
     if ctx_mem: system+=f"\n\n[MÉMOIRE {st.session_state.user_id}]:\n{ctx_mem}"
     if ctx_files: system+=f"\n\n[FICHIERS]:\n{ctx_files[:3000]}"
     if web_ctx: system+=web_ctx
+    # ── CONTEXTE VISUEL : ce que REIHANA voit via la caméra ──
+    _face_log = st.session_state.face_access_log
+    if _face_log:
+        _last = _face_log[-1]
+        _ts_diff = (datetime.now() - datetime.fromisoformat(_last['ts'])).total_seconds() if _last.get('ts') else 999
+        if _ts_diff < 30:  # données fraîches (< 30 secondes)
+            _vname = _last.get('name','inconnu')
+            _vage  = _last.get('age','?')
+            _vgender = _last.get('gender','?')
+            _vexpr = _last.get('expression','?')
+            _vcam  = 'avant' if _last.get('cam','user')=='user' else 'arrière'
+            _vision_ctx = f"\n\n[VISION CAMÉRA — ce que tu vois en ce moment]:\n"
+            if _vname and _vname != 'inconnu':
+                _vision_ctx += f"Devant toi : {_vname}, {_vgender}, ~{_vage} ans, expression : {_vexpr}. "
+                _vision_ctx += f"Utilise son prénom dans ta réponse de façon naturelle."
+            else:
+                _vision_ctx += f"Devant toi : une personne ({_vgender}, ~{_vage} ans), expression : {_vexpr}. "
+                _vision_ctx += f"Adapte ton ton à cette expression."
+            _vision_ctx += f" (caméra {_vcam})"
+            system += _vision_ctx
     msgs=st.session_state.messages if not regen else st.session_state.messages[:regen_idx-1]
     groq_msgs=[{"role":m["role"],"content":m["content"]} for m in msgs[-12:] if m["role"] in ["user","assistant"]]
     groq_msgs.append({"role":"user","content":question})
@@ -2385,7 +2403,7 @@ _av_html = f"""<html><head>
 </div>
 <video id="avVideo" autoplay muted playsinline></video>
 <canvas id="avCanvas"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 var _avActive=false,_avStream=null,_avFaceInt=null,_avRecog=null;
 var _avFacing='user'; // avant par défaut
@@ -2430,12 +2448,11 @@ function identifyAV(desc){{
 async function loadAVModels(){{
   if(_avModelsLoaded) return;
   avStatus.innerText='⏳ CHARGEMENT...';
+  var W='https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
   await Promise.all([
-    faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-    faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+    faceapi.nets.tinyFaceDetector.loadFromUri(W),
+    faceapi.nets.faceExpressionNet.loadFromUri(W),
+    faceapi.nets.ageGenderNet.loadFromUri(W)
   ]);
   _avModelsLoaded=true;
 }}
@@ -2469,10 +2486,9 @@ async function startAV(){{
       if(!avVideo||!_avActive) return;
       try{{
         var det=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks(true).withFaceDescriptor()
           .withFaceExpressions().withAgeAndGender();
         if(det){{
-          var name=identifyAV(det.descriptor);
+          var name=null; // identification par descripteur désactivée
           var age=Math.round(det.age);
           var exprs=det.expressions;
           var topExpr=Object.entries(exprs).sort(function(a,b){{return b[1]-a[1];}})[0][0];
