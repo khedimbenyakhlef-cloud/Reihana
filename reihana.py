@@ -718,6 +718,8 @@ defs = {
     # ── NOUVEAU : fonctionnalités du livre ──
     "face_profiles": {},          # {user_id: encodage_visage_base64}
     "face_access_log": [],        # log des accès caméra
+    "face_known_names": [],       # liste des noms enregistrés (côté Python)
+    "last_face_name": "",         # dernier visage identifié
     "geo_alerts": [],             # historique alertes géolocalisation
     "conv_encrypted": True,       # chiffrement AES activé
     "aes_key": None,              # clé Fernet
@@ -1217,6 +1219,29 @@ def show_admin_dashboard():
             pass
         st.success("Alertes purgées !")
         st.rerun()
+    
+    # ── Visages identifiés (nouveau) ──
+    st.markdown("### 👁️ Accès Caméra — Visages Identifiés")
+    face_log = st.session_state.face_access_log[-10:] if st.session_state.face_access_log else []
+    if face_log:
+        for entry in reversed(face_log):
+            _fn = entry.get("name","?")
+            _color = "#00ffcc" if _fn not in ("inconnu","?") else "#cc88ff"
+            st.markdown(f"""
+            <div style="background:rgba(0,20,40,0.8);border:1px solid rgba(0,200,150,0.2);
+            border-radius:8px;padding:8px;margin:3px 0;font-family:Rajdhani,sans-serif;font-size:0.78rem;">
+            👤 <b style="color:{_color};">{_fn}</b> · 
+            {entry.get('age','?')}ans · {entry.get('gender','?')} · 
+            😐 {entry.get('expression','?')} · 
+            📷 cam:{entry.get('cam','?')} · 
+            <span style="color:rgba(150,150,200,0.5);">{entry.get('ts','?')[:16]}</span>
+            </div>
+            """, unsafe_allow_html=True)
+        known_names = st.session_state.get("face_known_names", [])
+        if known_names:
+            st.markdown(f"**Base visages enregistrés :** {', '.join(known_names)}")
+    else:
+        st.info("Aucun accès caméra enregistré")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1359,53 +1384,127 @@ function startGesture(){
 """
 
 # ═══════════════════════════════════════════════════════════════
-# 👁️ MODULE 8 : RECONNAISSANCE FACIALE HTML (livre p.78)
+# 👁️ MODULE 8 : RECONNAISSANCE FACIALE v2 — IDENTIFICATION + CAMÉRA AV/AR
 # ═══════════════════════════════════════════════════════════════
 FACE_HTML = """
 <html><head>
 <style>
   body{margin:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}
-  #fzone{display:flex;align-items:center;gap:8px;padding:4px;}
-  #fBtn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(150,50,255,0.5);
-    background:rgba(20,0,40,0.9);color:#aa55ff;font-size:18px;cursor:pointer;
+  #fzone{display:flex;align-items:center;gap:6px;padding:4px;flex-wrap:wrap;}
+  #fBtn{width:40px;height:40px;border-radius:50%;border:2px solid rgba(150,50,255,0.5);
+    background:rgba(20,0,40,0.9);color:#aa55ff;font-size:16px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;transition:all .2s;}
   #fBtn.scanning{border-color:#ff5588;color:#ff5588;animation:fPulse .6s infinite;}
+  #fCamSwitch{width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,200,255,0.4);
+    background:rgba(0,20,40,0.8);color:#00ccff;font-size:14px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;}
+  #fEnroll{font-size:9px;border:1px solid rgba(150,50,255,0.4);background:rgba(30,0,60,0.8);
+    color:#cc88ff;padding:3px 7px;border-radius:6px;cursor:pointer;letter-spacing:1px;}
   @keyframes fPulse{0%,100%{box-shadow:0 0 8px rgba(255,50,100,.4);}50%{box-shadow:0 0 22px rgba(255,50,100,.9);}}
   #fStatus{font-size:9px;letter-spacing:2px;color:rgba(150,50,255,0.5);}
-  #fResult{font-size:11px;color:rgba(220,180,255,0.8);font-family:Rajdhani,sans-serif;}
-  #fCanvas{display:none;width:200px;height:150px;border-radius:8px;border:1px solid rgba(150,50,255,0.3);}
+  #fResult{font-size:11px;color:rgba(220,180,255,0.9);font-family:Rajdhani,sans-serif;font-weight:600;}
+  #fCanvas{display:none;width:220px;height:160px;border-radius:8px;border:1px solid rgba(150,50,255,0.4);margin-top:4px;}
+  #fEnrollZone{display:none;background:rgba(20,0,40,0.95);border:1px solid rgba(150,50,255,0.4);
+    border-radius:8px;padding:8px;margin-top:6px;width:220px;}
+  #fEnrollZone input{width:90%;background:rgba(0,0,20,0.8);border:1px solid rgba(150,50,255,0.3);
+    color:#cc88ff;font-size:10px;padding:4px 6px;border-radius:4px;outline:none;font-family:Rajdhani,sans-serif;}
+  #fSaveBtn{margin-top:5px;font-size:9px;border:1px solid rgba(0,255,150,0.5);background:rgba(0,40,20,0.8);
+    color:#00ff88;padding:3px 10px;border-radius:5px;cursor:pointer;width:100%;letter-spacing:1px;}
+  #fKnownList{font-size:9px;color:rgba(180,150,255,0.6);margin-top:4px;letter-spacing:1px;}
+  .fid-known{color:#00ffcc;font-size:12px;font-weight:700;}
+  .fid-unknown{color:rgba(220,180,255,0.7);}
 </style></head><body>
 <div id="fzone">
   <button id="fBtn" onclick="toggleFace()" title="Reconnaissance faciale">👁️</button>
-  <div>
-    <div id="fStatus">CAMÉRA PRÊTE</div>
-    <div id="fResult">Cliquez 👁️ pour scanner</div>
-  </div>
+  <button id="fCamSwitch" onclick="switchCam()" title="Caméra av/ar">🔄</button>
+  <button id="fEnroll" onclick="toggleEnroll()">➕ ENROL</button>
 </div>
+<div><div id="fStatus">CAMÉRA PRÊTE</div><div id="fResult">Cliquez 👁️ pour scanner</div></div>
 <canvas id="fCanvas"></canvas>
+<div id="fEnrollZone">
+  <div style="font-size:9px;color:rgba(150,50,255,0.7);letter-spacing:2px;margin-bottom:4px;">ENREGISTRER VISAGE</div>
+  <input id="fNameInput" placeholder="Nom de la personne..." maxlength="30"/>
+  <button id="fSaveBtn" onclick="enrollFace()">📸 CAPTURER &amp; ENREGISTRER</button>
+  <div id="fKnownList">Personnes connues: <span id="fKnownCount">0</span></div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
-var _factive=false, _fstream=null, _fvideo=null, _fint=null;
+var _factive=false,_fstream=null,_fvideo=null,_fint=null;
+var _facingMode='user'; // 'user'=avant, 'environment'=arrière
+var _modelsLoaded=false;
+var _knownFaces=[]; // [{name, descriptor}]
 var fBtn=document.getElementById('fBtn');
 var fStatus=document.getElementById('fStatus');
 var fResult=document.getElementById('fResult');
 var fCanvas=document.getElementById('fCanvas');
+var fEnrollZone=document.getElementById('fEnrollZone');
 
-function toggleFace(){
-  if(_factive) stopFace();
-  else startFace();
+// ── Charger les visages sauvegardés depuis localStorage ──
+function loadKnownFaces(){
+  try{
+    var saved=localStorage.getItem('rei_known_faces');
+    if(saved){
+      var arr=JSON.parse(saved);
+      _knownFaces=arr.map(function(f){
+        return {name:f.name, descriptor:new Float32Array(f.descriptor)};
+      });
+    }
+  }catch(e){}
+  document.getElementById('fKnownCount').innerText=_knownFaces.length;
+}
+
+function saveKnownFaces(){
+  try{
+    var toSave=_knownFaces.map(function(f){
+      return {name:f.name, descriptor:Array.from(f.descriptor)};
+    });
+    localStorage.setItem('rei_known_faces',JSON.stringify(toSave));
+  }catch(e){}
+  document.getElementById('fKnownCount').innerText=_knownFaces.length;
+}
+
+// ── Identifier un visage parmi les connus ──
+function identifyFace(descriptor){
+  if(_knownFaces.length===0) return null;
+  var best=null, bestDist=0.52; // seuil de distance euclidienne
+  _knownFaces.forEach(function(kf){
+    var dist=faceapi.euclideanDistance(descriptor,kf.descriptor);
+    if(dist<bestDist){bestDist=dist;best=kf.name;}
+  });
+  return best;
+}
+
+function toggleFace(){if(_factive)stopFace();else startFace();}
+
+function toggleEnroll(){
+  fEnrollZone.style.display=fEnrollZone.style.display==='block'?'none':'block';
+}
+
+async function switchCam(){
+  _facingMode=(_facingMode==='user')?'environment':'user';
+  if(_factive){stopFace();await startFace();}
+  document.getElementById('fCamSwitch').innerText=_facingMode==='user'?'🔄':'🔃';
+}
+
+async function loadModels(){
+  if(_modelsLoaded) return;
+  fStatus.innerText='⏳ MODÈLES...';
+  await Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+  ]);
+  _modelsLoaded=true;
 }
 
 async function startFace(){
   try{
-    fStatus.innerText='⏳ CHARGEMENT MODÈLES...';
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-      faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
-      faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
-    ]);
-    
-    var stream=await navigator.mediaDevices.getUserMedia({video:{width:320,height:240},audio:false});
+    loadKnownFaces();
+    await loadModels();
+    var constraints={video:{facingMode:_facingMode,width:320,height:240},audio:false};
+    var stream=await navigator.mediaDevices.getUserMedia(constraints);
     _fstream=stream;
     _fvideo=document.createElement('video');
     _fvideo.srcObject=stream;
@@ -1414,34 +1513,88 @@ async function startFace(){
     fBtn.className='scanning';fBtn.innerText='⏹';
     fStatus.innerText='👁️ SCAN EN COURS...';
     fCanvas.style.display='block';
-    
+
     _fint=setInterval(async function(){
       if(!_fvideo||!_factive) return;
       var det=await faceapi.detectSingleFace(_fvideo,new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks(true).withFaceDescriptor()
         .withFaceExpressions().withAgeAndGender();
       if(det){
         var age=Math.round(det.age);
         var gender=det.gender==='male'?'Homme':'Femme';
         var exprs=det.expressions;
         var topExpr=Object.entries(exprs).sort(function(a,b){return b[1]-a[1];})[0][0];
-        var exprFr={happy:'Heureux',sad:'Triste',angry:'En colère',fearful:'Craintif',disgusted:'Dégoûté',surprised:'Surpris',neutral:'Neutre'};
-        fResult.innerText=gender+' ~'+age+' ans — '+( exprFr[topExpr]||topExpr );
-        fStatus.innerText='✅ VISAGE DÉTECTÉ';
-        // Envoyer à Streamlit
+        var exprFr={happy:'😊 Heureux',sad:'😢 Triste',angry:'😠 Colère',fearful:'😨 Craintif',disgusted:'🤢 Dégoûté',surprised:'😲 Surpris',neutral:'😐 Neutre'};
+        
+        // ── IDENTIFICATION ──
+        var name=identifyFace(det.descriptor);
+        var nameHtml=name
+          ?'<span class="fid-known">✅ '+name+'</span>'
+          :'<span class="fid-unknown">❓ Inconnu</span>';
+        
+        fResult.innerHTML=nameHtml+' · '+gender+' ~'+age+'<br>'+(exprFr[topExpr]||topExpr);
+        fStatus.innerText=name?'🌸 BIENVENUE '+name.toUpperCase():'✅ VISAGE DÉTECTÉ';
+        
+        // Dessiner sur canvas
+        var ctx=fCanvas.getContext('2d');
+        fCanvas.width=det.detection.imageSize.width;
+        fCanvas.height=det.detection.imageSize.height;
+        ctx.drawImage(_fvideo,0,0,fCanvas.width,fCanvas.height);
+        var box=det.detection.box;
+        ctx.strokeStyle=name?'#00ffcc':'#aa55ff';
+        ctx.lineWidth=2;
+        ctx.strokeRect(box.x,box.y,box.width,box.height);
+        ctx.fillStyle=name?'#00ffcc':'#aa55ff';
+        ctx.font='11px Orbitron,monospace';
+        ctx.fillText(name||'Inconnu',box.x,box.y-4);
+        
+        // ── Envoyer à Streamlit ──
         try{
           var url=window.location.href.split("?")[0]
-            +"?face_detected=1&face_age="+age+"&face_gender="+gender+"&face_expr="+(exprFr[topExpr]||topExpr);
+            +"?face_detected=1&face_age="+age+"&face_gender="+gender
+            +"&face_expr="+(topExpr)+"&face_name="+(name||"inconnu")
+            +"&face_cam="+_facingMode;
           window.parent.history.replaceState(null,'',url);
         }catch(e){}
       }else{
-        fResult.innerText='Aucun visage visible...';
+        fResult.innerHTML='<span class="fid-unknown">Aucun visage visible...</span>';
         fStatus.innerText='👁️ SCAN EN COURS...';
+        // Canvas vide
+        var ctx=fCanvas.getContext('2d');
+        ctx.clearRect(0,0,fCanvas.width,fCanvas.height);
+        if(_fvideo) ctx.drawImage(_fvideo,0,0,fCanvas.width||320,fCanvas.height||240);
       }
-    },1500);
+    },1200);
   }catch(e){
     fStatus.innerText='⚠️ '+e.message;
-    fResult.innerText='Chrome requis';
+    fResult.innerHTML='Chrome requis';
   }
+}
+
+// ── ENRÔLEMENT : capturer et sauvegarder un nouveau visage ──
+async function enrollFace(){
+  var name=document.getElementById('fNameInput').value.trim();
+  if(!name){fResult.innerHTML='⚠️ Entrez un nom d\'abord';return;}
+  if(!_fvideo||!_factive){fResult.innerHTML='⚠️ Activez la caméra d\'abord';return;}
+  try{
+    fStatus.innerText='📸 CAPTURE EN COURS...';
+    var det=await faceapi.detectSingleFace(_fvideo,new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks(true).withFaceDescriptor();
+    if(!det){fResult.innerHTML='⚠️ Aucun visage détecté';return;}
+    // Supprimer l'ancienne entrée si même nom
+    _knownFaces=_knownFaces.filter(function(f){return f.name.toLowerCase()!==name.toLowerCase();});
+    _knownFaces.push({name:name,descriptor:det.descriptor});
+    saveKnownFaces();
+    fResult.innerHTML='<span class="fid-known">✅ '+name+' enregistré !</span>';
+    fStatus.innerText='✅ PROFIL SAUVÉ';
+    document.getElementById('fNameInput').value='';
+    fEnrollZone.style.display='none';
+    // Notifier Streamlit
+    try{
+      var url=window.location.href.split("?")[0]+"?face_enrolled="+encodeURIComponent(name);
+      window.parent.history.replaceState(null,'',url);
+    }catch(e){}
+  }catch(e){fResult.innerHTML='⚠️ Erreur: '+e.message;}
 }
 
 function stopFace(){
@@ -1451,9 +1604,12 @@ function stopFace(){
   _fvideo=null;_fstream=null;
   fBtn.className='';fBtn.innerText='👁️';
   fStatus.innerText='CAMÉRA PRÊTE';
-  fResult.innerText='Cliquez 👁️ pour scanner';
+  fResult.innerHTML='Cliquez 👁️ pour scanner';
   fCanvas.style.display='none';
 }
+
+// Init
+loadKnownFaces();
 </script>
 </body></html>
 """
@@ -2046,10 +2202,24 @@ window.reiSetVol=setVol;
     csens1, csens2 = st.columns(2)
     with csens1:
         st.markdown('<div style="font-family:Orbitron,monospace;font-size:0.6rem;color:rgba(150,50,255,0.6);text-align:center;">👁️ VISAGE</div>', unsafe_allow_html=True)
-        _sens_comp.html(FACE_HTML, height=60)
+        _sens_comp.html(FACE_HTML, height=90)
     with csens2:
         st.markdown('<div style="font-family:Orbitron,monospace;font-size:0.6rem;color:rgba(0,255,100,0.6);text-align:center;">✋ GESTES</div>', unsafe_allow_html=True)
         _sens_comp.html(GESTURE_HTML, height=60)
+
+    # ── Afficher le dernier visage reconnu ──
+    _last_face_log = st.session_state.face_access_log[-1] if st.session_state.face_access_log else None
+    if _last_face_log:
+        _fn = _last_face_log.get("name","?")
+        _fe = _last_face_log.get("expression","?")
+        _fa = _last_face_log.get("age","?")
+        _fc = "📷" if _last_face_log.get("cam","user")=="user" else "🔃"
+        _color = "#00ffcc" if _fn not in ("inconnu","?") else "rgba(200,150,255,0.6)"
+        st.markdown(f'<div style="font-family:Rajdhani,sans-serif;font-size:0.7rem;color:{_color};padding:3px 6px;background:rgba(0,10,20,0.5);border-radius:6px;margin:3px 0;">{_fc} <b>{_fn}</b> · {_fa}ans · {_fe}</div>', unsafe_allow_html=True)
+    # ── Personnes connues dans la base ──
+    _known = st.session_state.get("face_known_names",[])
+    if _known:
+        st.markdown(f'<div style="font-family:Orbitron,monospace;font-size:0.58rem;color:rgba(0,255,180,0.5);letter-spacing:1px;">BASE: {", ".join(_known[:4])}</div>', unsafe_allow_html=True)
 
     # ══ SÉCURITÉ : chiffrement toggle ══
     enc_label = "🔐 AES ON" if st.session_state.conv_encrypted else "🔓 AES OFF"
@@ -2173,6 +2343,232 @@ for i,msg in enumerate(st.session_state.messages):
                     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════
+# 🎥 MODULE CHAT AUDIO/VISUEL — REIHANA VOIT + ENTEND EN MÊME TEMPS
+# ══════════════════════════════════════════════════════════════════
+import streamlit.components.v1 as _av_comp
+
+_av_lang_map = {"🇫🇷 Français": "fr-FR", "🇩🇿 العربية": "ar-SA", "🇬🇧 English": "en-US"}
+_av_lang = _av_lang_map.get(st.session_state.langue, "fr-FR")
+_av_known_str = ",".join(st.session_state.get("face_known_names", []))
+
+_av_html = f"""<html><head>
+<style>
+  body{{margin:0;padding:0;background:transparent;font-family:Orbitron,monospace;overflow:hidden;}}
+  #avZone{{display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;}}
+  #avBtn{{width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,80,200,0.5);
+    background:rgba(30,0,30,0.9);color:#ff55cc;font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0;}}
+  #avBtn.active{{border-color:#ff3399;animation:avPulse .8s infinite;}}
+  #avCamBtn{{width:34px;height:34px;border-radius:50%;border:1px solid rgba(0,200,255,0.4);
+    background:rgba(0,20,40,0.8);color:#00ccff;font-size:13px;cursor:pointer;flex-shrink:0;}}
+  @keyframes avPulse{{0%,100%{{box-shadow:0 0 10px rgba(255,50,150,.4);}}50%{{box-shadow:0 0 26px rgba(255,50,150,.9);}}}}
+  #avStatus{{font-size:9px;letter-spacing:2px;color:rgba(255,80,200,0.5);}}
+  #avStatus.on{{color:#ff3399;}}
+  #avStatus.ok{{color:#00ffcc;}}
+  #avInfo{{font-size:10px;color:rgba(220,150,255,0.7);font-family:Rajdhani,sans-serif;font-weight:600;max-width:200px;}}
+  #avVideo{{display:none;width:180px;height:120px;border-radius:8px;border:1px solid rgba(255,80,200,0.4);
+    margin-top:4px;object-fit:cover;transform:scaleX(-1);}}
+  #avVideo.rear{{transform:scaleX(1);}}
+  #avCanvas{{display:none;}}
+  #avMoodBar{{font-size:8px;color:rgba(255,150,255,0.5);margin-top:2px;letter-spacing:1px;}}
+</style></head><body>
+<div id="avZone">
+  <button id="avBtn" onclick="toggleAV()" title="Chat Audio/Visuel — REIHANA voit et entend">👁️‍🗨️</button>
+  <button id="avCamBtn" onclick="switchAVCam()" title="Caméra av/ar">🔄</button>
+  <div>
+    <div id="avStatus">AUDIO/VISUEL PRÊT</div>
+    <div id="avInfo">Cliquez 👁️‍🗨️ — REIHANA voit + entend</div>
+    <div id="avMoodBar"></div>
+  </div>
+</div>
+<video id="avVideo" autoplay muted playsinline></video>
+<canvas id="avCanvas"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script>
+var _avActive=false,_avStream=null,_avFaceInt=null,_avRecog=null;
+var _avFacing='user'; // avant par défaut
+var _avModelsLoaded=false;
+var _avLang='{_av_lang}';
+var _avKnown=[]; // noms déjà connus depuis Python
+var _avLastName='';
+var avBtn=document.getElementById('avBtn');
+var avStatus=document.getElementById('avStatus');
+var avInfo=document.getElementById('avInfo');
+var avVideo=document.getElementById('avVideo');
+var avCanvas=document.getElementById('avCanvas');
+var avMoodBar=document.getElementById('avMoodBar');
+
+// Charger base de visages localStorage
+function loadAVFaces(){{
+  try{{
+    var s=localStorage.getItem('rei_known_faces');
+    if(s){{
+      var arr=JSON.parse(s);
+      _avKnown=arr.map(function(f){{return {{name:f.name,descriptor:new Float32Array(f.descriptor)}}}});
+    }}
+  }}catch(e){{}}
+  // Ajouter ceux transmis par Python (noms seulement, pour affichage)
+  var fromPy='{_av_known_str}'.split(',').filter(function(n){{return n.trim();}});
+  fromPy.forEach(function(n){{
+    if(!_avKnown.find(function(f){{return f.name===n;}})) _avKnown.push({{name:n,descriptor:null}});
+  }});
+}}
+
+function identifyAV(desc){{
+  if(!desc) return null;
+  var best=null,bestD=0.52;
+  _avKnown.forEach(function(kf){{
+    if(!kf.descriptor) return;
+    var d=faceapi.euclideanDistance(desc,kf.descriptor);
+    if(d<bestD){{bestD=d;best=kf.name;}}
+  }});
+  return best;
+}}
+
+async function loadAVModels(){{
+  if(_avModelsLoaded) return;
+  avStatus.innerText='⏳ CHARGEMENT...';
+  await Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.faceExpressionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights'),
+    faceapi.nets.ageGenderNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights')
+  ]);
+  _avModelsLoaded=true;
+}}
+
+function switchAVCam(){{
+  _avFacing=(_avFacing==='user')?'environment':'user';
+  avVideo.className=_avFacing==='environment'?'rear':'';
+  if(_avActive){{stopAV();startAV();}}
+}}
+
+function toggleAV(){{if(_avActive)stopAV();else startAV();}}
+
+async function startAV(){{
+  try{{
+    loadAVFaces();
+    await loadAVModels();
+    // ── Démarrer caméra ──
+    var constraints={{video:{{facingMode:_avFacing,width:320,height:240}},audio:false}};
+    _avStream=await navigator.mediaDevices.getUserMedia(constraints);
+    avVideo.srcObject=_avStream;
+    avVideo.style.display='block';
+    _avActive=true;
+    avBtn.classList.add('active');
+    avBtn.innerText='⏹';
+    avStatus.innerText='🎥 VU + ÉCOUTÉ';
+    avStatus.className='on';
+    avInfo.innerText='REIHANA voit... parlez !';
+    
+    // ── Démarrer détection visage en continu ──
+    _avFaceInt=setInterval(async function(){{
+      if(!avVideo||!_avActive) return;
+      try{{
+        var det=await faceapi.detectSingleFace(avVideo,new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks(true).withFaceDescriptor()
+          .withFaceExpressions().withAgeAndGender();
+        if(det){{
+          var name=identifyAV(det.descriptor);
+          var age=Math.round(det.age);
+          var exprs=det.expressions;
+          var topExpr=Object.entries(exprs).sort(function(a,b){{return b[1]-a[1];}})[0][0];
+          var exprEm={{happy:'😊',sad:'😢',angry:'😠',fearful:'😨',disgusted:'🤢',surprised:'😲',neutral:'😐'}};
+          var nameLabel=name||'?';
+          
+          avInfo.innerHTML=(name?'<span style="color:#00ffcc;">✅ '+name+'</span>':'<span style="color:#cc88ff;">❓ Inconnu</span>')
+            +' · '+age+'ans · '+(exprEm[topExpr]||topExpr);
+          avMoodBar.innerText='👁️ DÉTECTÉ · cam:'+ (_avFacing==='user'?'avant':'arrière');
+          
+          // Notifier Python si nouveau visage identifié
+          if(name && name!==_avLastName){{
+            _avLastName=name;
+            try{{
+              var url=window.location.href.split("?")[0]
+                +"?face_detected=1&face_age="+age+"&face_gender="+(det.gender==='male'?'Homme':'Femme')
+                +"&face_expr="+topExpr+"&face_name="+encodeURIComponent(name)
+                +"&face_cam="+_avFacing;
+              window.parent.history.replaceState(null,'',url);
+            }}catch(e){{}}
+          }}
+        }}else{{
+          avInfo.innerText='Aucun visage détecté... parlez !';
+          avMoodBar.innerText='';
+        }}
+      }}catch(e){{}}
+    }},1500);
+    
+    // ── Démarrer reconnaissance vocale en continu ──
+    startAVSpeech();
+    
+  }}catch(e){{
+    avStatus.innerText='⚠️ '+e.message;
+    avInfo.innerText='Vérifiez les permissions caméra/micro';
+  }}
+}}
+
+function startAVSpeech(){{
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){{avInfo.innerText='Speech: Chrome/Edge requis';return;}}
+  _avRecog=new SR();
+  _avRecog.lang=_avLang;
+  _avRecog.continuous=true;
+  _avRecog.interimResults=true;
+  _avRecog.maxAlternatives=1;
+  
+  _avRecog.onresult=function(e){{
+    var final_t='',interim_t='';
+    for(var i=e.resultIndex;i<e.results.length;i++){{
+      var t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) final_t+=t;
+      else interim_t+=t;
+    }}
+    if(interim_t) avInfo.innerHTML='🎙️ <em style="color:rgba(255,150,255,0.7);">'+interim_t+'...</em>';
+    if(final_t.trim()){{
+      avInfo.innerHTML='✅ <span style="color:#00ffcc;">'+final_t.trim()+'</span>';
+      avStatus.className='ok';
+      avStatus.innerText='✅ ENVOYÉ';
+      // Envoyer à Streamlit via query_params
+      var base=window.location.href.split("?")[0];
+      try{{
+        window.parent.location.href=base+"?stt_text="+encodeURIComponent(final_t.trim());
+      }}catch(ex){{
+        window.location.href=base+"?stt_text="+encodeURIComponent(final_t.trim());
+      }}
+    }}
+  }};
+  _avRecog.onerror=function(e){{
+    if(e.error==='no-speech') return;
+    avStatus.innerText='⚠️ Micro: '+e.error;
+  }};
+  _avRecog.onend=function(){{
+    if(_avActive) setTimeout(function(){{try{{_avRecog.start();}}catch(ex){{}}}},800);
+  }};
+  try{{_avRecog.start();}}catch(e){{}}
+}}
+
+function stopAV(){{
+  _avActive=false;
+  clearInterval(_avFaceInt);
+  if(_avStream)_avStream.getTracks().forEach(function(t){{t.stop();}});
+  _avStream=null;
+  if(_avRecog){{try{{_avRecog.stop();}}catch(e){{}}}}
+  avVideo.style.display='none';
+  avBtn.classList.remove('active');
+  avBtn.innerText='👁️‍🗨️';
+  avStatus.className='';
+  avStatus.innerText='AUDIO/VISUEL PRÊT';
+  avInfo.innerText='Cliquez 👁️‍🗨️ — REIHANA voit + entend';
+  avMoodBar.innerText='';
+  _avLastName='';
+}}
+loadAVFaces();
+</script></body></html>"""
+
+_av_comp.html(_av_html, height=85)
 
 # ── Reconnaissance vocale — Web Speech API avec allow="microphone" ──
 import streamlit.components.v1 as _comp_v1
@@ -2800,10 +3196,41 @@ if _face_det:
     _face_age = st.query_params.get("face_age","?")
     _face_gender = st.query_params.get("face_gender","?")
     _face_expr = st.query_params.get("face_expr","?")
+    _face_name = st.query_params.get("face_name","inconnu")
+    _face_cam  = st.query_params.get("face_cam","user")
     st.session_state.face_access_log.append({
         "ts": datetime.now().isoformat(),
-        "age": _face_age, "gender": _face_gender, "expression": _face_expr
+        "age": _face_age, "gender": _face_gender, "expression": _face_expr,
+        "name": _face_name, "cam": _face_cam
     })
+    # ── Si visage connu et nouveau : salutation personnalisée ──
+    _last_name = st.session_state.get("last_face_name","")
+    if _face_name and _face_name != "inconnu" and _face_name != _last_name:
+        st.session_state.last_face_name = _face_name
+        # Personnaliser le profil utilisateur avec ce nom
+        st.session_state.user_id = _face_name
+        # Message de bienvenue automatique dans le chat
+        _greet_text = f"Bonjour {_face_name} ! 🌸 Je t'ai reconnu(e) ! Comment puis-je t'aider aujourd'hui ?"
+        if st.session_state.langue == "🇬🇧 English":
+            _greet_text = f"Hello {_face_name}! 🌸 I recognized you! How can I help you today?"
+        elif st.session_state.langue == "🇩🇿 العربية":
+            _greet_text = f"مرحباً {_face_name}! 🌸 لقد تعرفت عليك! كيف يمكنني مساعدتك اليوم؟"
+        st.session_state.messages.append({"role":"assistant","content":_greet_text})
+        play_reihana_voice(_greet_text, lang=detect_text_lang(_greet_text))
+        st.rerun()
+
+# ── TRAITER ENRÔLEMENT DE VISAGE ──
+_face_enrolled = st.query_params.get("face_enrolled","")
+if _face_enrolled and _face_enrolled.strip():
+    _enrolled_name = _face_enrolled.strip()
+    # Sauvegarder le profil de ce nouveau visage connu
+    get_user_profile(_enrolled_name)
+    if "face_known_names" not in st.session_state:
+        st.session_state.face_known_names = []
+    if _enrolled_name not in st.session_state.face_known_names:
+        st.session_state.face_known_names.append(_enrolled_name)
+    st.toast(f"✅ Visage de {_enrolled_name} enregistré dans la base !", icon="👁️")
+    st.query_params.clear()
 
 st.markdown('<div class="holo-line"></div>', unsafe_allow_html=True)
 st.markdown(f'<div style="font-family:Orbitron,monospace;color:rgba({g},0.45);font-size:0.6rem;letter-spacing:3px;margin-bottom:8px;">SUGGESTIONS RAPIDES</div>', unsafe_allow_html=True)
