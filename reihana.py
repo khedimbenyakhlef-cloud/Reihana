@@ -1495,6 +1495,15 @@ async function loadModels(){
     faceapi.nets.faceExpressionNet.loadFromUri(W),
     faceapi.nets.ageGenderNet.loadFromUri(W)
   ]);
+  // Charger aussi le modèle de reconnaissance si possible
+  try {
+    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(W);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(W);
+  } catch(e2) { /* optionnel */ }
+  // Tenter aussi le modèle de reconnaissance faciale (optionnel)
+  try {
+    await faceapi.nets.faceRecognitionNet.loadFromUri(W);
+  } catch(e2) { /* fallback sans reconnaissance */ }
   _modelsLoaded=true;
 }
 
@@ -2238,6 +2247,14 @@ window.reiSetVol=setVol;
     _known = st.session_state.get("face_known_names",[])
     if _known:
         st.markdown(f'<div style="font-family:Orbitron,monospace;font-size:0.58rem;color:rgba(0,255,180,0.5);letter-spacing:1px;">BASE: {", ".join(_known[:4])}</div>', unsafe_allow_html=True)
+    # ── Bouton supprimer un visage ──
+    if _known:
+        _del_name = st.selectbox("", ["-- Supprimer un visage --"] + _known, label_visibility="collapsed", key="del_face_sel")
+        if _del_name != "-- Supprimer un visage --":
+            if st.button(f"🗑️ Supprimer {_del_name}", use_container_width=True, key="del_face_btn"):
+                st.session_state.face_known_names = [n for n in _known if n != _del_name]
+                st.toast(f"✅ {_del_name} retiré de la base", icon="🗑️")
+                st.rerun()
 
     # ══ SÉCURITÉ : chiffrement toggle ══
     enc_label = "🔐 AES ON" if st.session_state.conv_encrypted else "🔓 AES OFF"
@@ -2380,7 +2397,9 @@ body {{
   background:transparent;
   font-family:Orbitron,monospace;
   overflow-x:hidden;
+  overflow-y:auto;
   padding:4px;
+  min-height:400px;
 }}
 
 /* ══ BARRE DE CONTRÔLES ══ */
@@ -2466,6 +2485,16 @@ body {{
   pointer-events:none;z-index:5;animation:scanMove 3s linear infinite;
 }}
 @keyframes scanMove{{0%{{background-position:0 0;}}100%{{background-position:0 120px;}}}}
+/* Mode nuit / thermique */
+#avScreen.night-mode video {{
+  filter: hue-rotate(180deg) saturate(3) brightness(0.8) !important;
+}}
+#avNightBtn {{
+  position:absolute;bottom:36px;right:6px;
+  background:rgba(0,0,20,0.85);border:1px solid rgba(0,200,255,0.4);
+  color:#00ccff;font-size:9px;padding:2px 6px;border-radius:4px;
+  cursor:pointer;z-index:15;letter-spacing:1px;
+}}
 /* Coin déco haut-gauche */
 #avCornerTL {{
   position:absolute;top:6px;left:6px;width:22px;height:22px;
@@ -2558,14 +2587,16 @@ body {{
 
 <!-- ══ BARRE DE CONTRÔLES ══ -->
 <div id="avBar">
-  <button id="avBtn" class="av-btn-round" onclick="toggleAV()" title="Activer caméra — REIHANA vous voit et reconnaît">👁️</button>
+  <button id="avBtn" class="av-btn-round" onclick="toggleAV()" title="Activer / Arrêter la caméra">👁️</button>
   <button id="avCamBtn" class="av-btn-round" onclick="switchCam()" title="Basculer caméra avant / arrière">🔄</button>
-  <button id="avMicBtn" class="av-btn-round" onclick="toggleMic()" title="Activer le microphone — REIHANA vous entend">🎙️</button>
+  <button id="avMicBtn" class="av-btn-round" onclick="toggleMic()" title="Activer le microphone">🎙️</button>
+  <button id="avSnapBtn" class="av-btn-round" onclick="snapPhoto()" title="Capturer une photo" style="width:36px;height:36px;border:1.5px solid rgba(255,220,0,0.5)!important;background:rgba(30,20,0,0.9);color:#ffdd00;font-size:15px;">📸</button>
   <button id="avEnrolBtn" onclick="toggleEnrol()">➕ ENRÔLER</button>
   <div class="av-info-wrap">
     <div id="avStatus">CAMÉRA PRÊTE</div>
     <div id="avInfo">Cliquez 👁️ pour activer</div>
   </div>
+  <div id="avFps" style="font-size:8px;color:rgba(0,255,120,0.4);letter-spacing:1px;display:none;">0 FPS</div>
 </div>
 
 <!-- ══ ÉCRAN DE VISUALISATION ══ -->
@@ -2576,6 +2607,7 @@ body {{
   <video id="avVideo" autoplay muted playsinline></video>
   <canvas id="avCanvas"></canvas>
   <div id="avBadge">❓ INCONNU</div>
+  <button id="avNightBtn" onclick="toggleNight()" title="Mode Vision Nuit / Thermique">🌙 NUIT</button>
   <div id="avInfoBar">
     <span id="avInfoL">👁️ EN ATTENTE</span>
     <span id="avInfoR">cam: avant</span>
@@ -2786,6 +2818,22 @@ function setSt(cls, txt) {{ elStatus.className = cls; elStatus.innerText = txt; 
 function setInfo(html) {{ elInfo.innerHTML = html; }}
 
 // ══════════════════════════════════════════
+// MODE VISION NUIT (filtre thermique)
+// ══════════════════════════════════════════
+var _nightMode = false;
+function toggleNight() {{
+  _nightMode = !_nightMode;
+  var btn = document.getElementById('avNightBtn');
+  if (_nightMode) {{
+    elScreen.classList.add('night-mode');
+    if (btn) {{ btn.style.color = '#ff8800'; btn.style.borderColor = 'rgba(255,120,0,0.6)'; btn.innerHTML = '🔆 NORMAL'; }}
+  }} else {{
+    elScreen.classList.remove('night-mode');
+    if (btn) {{ btn.style.color = '#00ccff'; btn.style.borderColor = 'rgba(0,200,255,0.4)'; btn.innerHTML = '🌙 NUIT'; }}
+  }}
+}}
+
+// ══════════════════════════════════════════
 // BASCULER CAMÉRA AV/AR
 // ══════════════════════════════════════════
 function switchCam() {{
@@ -2846,6 +2894,10 @@ async function startCam() {{
           elBadge.innerHTML = isKnown
             ? '✅ '+person.name+(person.post?'<br><span style="font-size:8px;opacity:.7;">'+person.post+'</span>':'')
             : '❓ INCONNU · '+gender+age;
+          // Compteur FPS
+          _fpsCount++;
+          // Tracker émotions
+          updateEmotionTracker(topExpr);
           // Info
           setInfo((isKnown
             ? '<span style="color:#00ffcc;font-weight:700;">✅ '+person.name+'</span>'
@@ -3004,13 +3056,72 @@ async function enrolFace() {{
 }}
 
 // ══════════════════════════════════════════
+// SNAP PHOTO
+// ══════════════════════════════════════════
+function snapPhoto() {{
+  if (!_active) {{ setInfo('<span style="color:#ff8800;">⚠️ Activez la caméra d\'abord</span>'); return; }}
+  var snap = document.createElement('canvas');
+  snap.width = elVideo.videoWidth || 640;
+  snap.height = elVideo.videoHeight || 480;
+  snap.getContext('2d').drawImage(elVideo, 0, 0);
+  var link = document.createElement('a');
+  link.download = 'reihana_snap_' + Date.now() + '.png';
+  link.href = snap.toDataURL('image/png');
+  link.click();
+  // Flash visuel
+  elScreen.style.filter = 'brightness(3)';
+  setTimeout(function() {{ elScreen.style.filter = ''; }}, 120);
+  setInfo('<span style="color:#ffdd00;">📸 Photo capturée !</span>');
+}}
+
+// ══════════════════════════════════════════
+// COMPTEUR FPS
+// ══════════════════════════════════════════
+var _fpsCount = 0, _fpsLast = Date.now();
+var elFps = document.getElementById('avFps');
+setInterval(function() {{
+  if (!_active || !elFps) return;
+  var now = Date.now();
+  var fps = Math.round(_fpsCount * 1000 / (now - _fpsLast));
+  elFps.style.display = 'block';
+  elFps.innerText = fps + ' FPS';
+  _fpsCount = 0; _fpsLast = now;
+}}, 1000);
+
+// ══════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════
 dbLoad();
+
+// ══════════════════════════════════════════
+// IDÉES BONUS — EMOTION TRACKER
+// ══════════════════════════════════════════
+var _emotionHistory = [];
+var _emotionBar = document.createElement('div');
+_emotionBar.id = 'emotionBar';
+_emotionBar.style.cssText = 'display:none;padding:4px 6px;background:rgba(0,10,25,.9);border:1px solid rgba(100,0,255,.3);border-radius:6px;margin-top:5px;font-size:8px;letter-spacing:1px;color:rgba(200,150,255,.7);';
+document.body.appendChild(_emotionBar);
+
+// Intercepter les détections pour tracker les émotions
+var _origFaceInt = null;
+function updateEmotionTracker(expr) {{
+  if (!expr) return;
+  _emotionHistory.push(expr);
+  if (_emotionHistory.length > 10) _emotionHistory.shift();
+  var counts = {{}};
+  _emotionHistory.forEach(function(e) {{ counts[e] = (counts[e]||0)+1; }});
+  var dominant = Object.entries(counts).sort(function(a,b){{return b[1]-a[1];}})[0];
+  if (dominant) {{
+    var emo = {{happy:'😊 Joyeux',sad:'😢 Triste',angry:'😠 Énervé',fearful:'😨 Inquiet',disgusted:'🤢 Dégoûté',surprised:'😲 Surpris',neutral:'😐 Neutre'}};
+    _emotionBar.style.display = 'block';
+    _emotionBar.innerHTML = '📊 HUMEUR DOMINANTE: <b style="color:#cc88ff;">' + (emo[dominant[0]]||dominant[0]) + '</b>';
+  }}
+}}
+
 </script>
 </body></html>"""
 
-_av_comp.html(_av_html, height=100)
+_av_comp.html(_av_html, height=420)
 
 # ── Reconnaissance vocale — Web Speech API avec allow="microphone" ──
 import streamlit.components.v1 as _comp_v1
@@ -3226,7 +3337,7 @@ function stopRecog() {{
 }}
 </script></body></html>"""
 
-_comp_v1.html(_stt_html, height=70)
+_comp_v1.html(_stt_html, height=80)
 
 # ── Bloc mort (gardé pour éviter erreurs de syntaxe) ──
 if False:
