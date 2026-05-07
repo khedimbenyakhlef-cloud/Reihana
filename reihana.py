@@ -1427,7 +1427,7 @@ FACE_HTML = """
   <button id="fSaveBtn" onclick="enrollFace()">📸 CAPTURER &amp; ENREGISTRER</button>
   <div id="fKnownList">Personnes connues: <span id="fKnownCount">0</span></div>
 </div>
-<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 var _factive=false,_fstream=null,_fvideo=null,_fint=null;
 var _facingMode='user'; // 'user'=avant, 'environment'=arrière
@@ -1489,7 +1489,7 @@ async function switchCam(){
 async function loadModels(){
   if(_modelsLoaded) return;
   fStatus.innerText='⏳ MODÈLES...';
-  var W='https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+  var W='https://cdn.jsdelivr.net/npm/face-api.js/weights';
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(W),
     faceapi.nets.faceExpressionNet.loadFromUri(W),
@@ -2399,7 +2399,7 @@ body {{
   overflow-x:hidden;
   overflow-y:auto;
   padding:4px;
-  min-height:400px;
+  min-height:500px;
 }}
 
 /* ══ BARRE DE CONTRÔLES ══ */
@@ -2626,7 +2626,7 @@ body {{
   <div id="avEnrolCount">Personnes enregistrées : <span id="avEnrolNum">0</span></div>
 </div>
 
-<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script>
 // ══════════════════════════════════════════
 // VARIABLES GLOBALES
@@ -2739,7 +2739,7 @@ async function loadModels() {{
   if (_modelsLoaded) return;
   setSt('', '⏳ MODÈLES IA...');
   setInfo('Chargement reconnaissance faciale...');
-  var W = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+  var W = 'https://cdn.jsdelivr.net/npm/face-api.js/weights';
   try {{
     await Promise.all([
       faceapi.nets.tinyFaceDetector.loadFromUri(W),
@@ -3121,7 +3121,7 @@ function updateEmotionTracker(expr) {{
 </script>
 </body></html>"""
 
-_av_comp.html(_av_html, height=420)
+_av_comp.html(_av_html, height=520)
 
 # ── Reconnaissance vocale — Web Speech API avec allow="microphone" ──
 import streamlit.components.v1 as _comp_v1
