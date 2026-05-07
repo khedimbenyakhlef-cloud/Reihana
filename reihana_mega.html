@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REIHANA · IA Holographique Mega</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js">
+</script>
+<style>
+:root {
+  --cyan:#00ffee; --pink:#ff44cc; --green:#00ff99; --purple:#aa44ff; --red:#ff4455;
+  --bg:#04000f; --panel:rgba(8,0,25,0.94); --border:rgba(0,255,238,0.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:radial-gradient(ellipse at 20% 50%,#0a0a2e 0%,#000010 40%,#050520 100%);
+  min-height:100vh;color:#c8f0ff;font-family:'Rajdhani',sans-serif;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background:radial-gradient(circle at 10% 20%,rgba(0,255,255,0.04) 0%,transparent 50%),
+             radial-gradient(circle at 90% 80%,rgba(120,0,255,0.05) 0%,transparent 50%);
+  pointer-events:none;}
+.container{display:flex;height:100vh;position:relative;z-index:1;}
+.sidebar{width:300px;min-width:300px;background:linear-gradient(180deg,rgba(2,2,30,0.98),rgba(5,5,50,0.98));
+  border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;
+  padding:16px 12px;overflow-y:auto;}
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+.holo-avatar{width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,rgba(0,255,255,0.15) 0%,rgba(0,68,255,0.08) 50%,transparent 70%);
+  border:2px solid rgba(0,255,255,0.5);box-shadow:0 0 30px rgba(0,255,255,0.4),0 0 60px rgba(0,150,255,0.2),inset 0 0 30px rgba(0,255,255,0.1);
+  display:flex;align-items:center;justify-content:center;font-size:52px;margin:8px auto;position:relative;
+  animation:holoPulse 3s ease-in-out infinite,holoColor 8s linear infinite;overflow:hidden;cursor:pointer;}
+.holo-avatar.speaking{box-shadow:0 0 60px rgba(0,255,150,0.9),0 0 120px rgba(0,255,100,0.5),inset 0 0 60px rgba(0,255,150,0.3)!important;
+  border-color:rgba(0,255,150,1)!important;animation:holoPulseFast 0.25s ease-in-out infinite!important;}
+@keyframes holoPulse{0%,100%{box-shadow:0 0 30px rgba(0,255,255,0.4),0 0 60px rgba(0,150,255,0.2),inset 0 0 30px rgba(0,255,255,0.1);}
+  50%{box-shadow:0 0 50px rgba(0,255,255,0.7),0 0 100px rgba(0,150,255,0.4),inset 0 0 50px rgba(0,255,255,0.2);}}
+@keyframes holoPulseFast{0%,100%{box-shadow:0 0 60px rgba(0,255,150,0.9),0 0 120px rgba(0,255,100,0.5);}
+  50%{box-shadow:0 0 80px rgba(0,255,150,1),0 0 160px rgba(0,255,100,0.8);}}
+@keyframes holoColor{0%{border-color:rgba(0,255,255,0.6);}33%{border-color:rgba(120,0,255,0.6);}
+  66%{border-color:rgba(0,150,255,0.6);}100%{border-color:rgba(0,255,255,0.6);}}
+.holo-avatar::after{content:'';position:absolute;inset:0;border-radius:50%;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,0.04) 2px,rgba(0,255,255,0.04) 4px);
+  animation:scanLines 1.5s linear infinite;}
+@keyframes scanLines{0%{background-position:0 0;}100%{background-position:0 100px;}}
+.holo-mouth{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);width:24px;height:4px;
+  background:rgba(0,255,200,0.7);border-radius:3px;transition:all 0.08s ease;box-shadow:0 0 8px rgba(0,255,200,0.5);}
+.holo-mouth.speaking{animation:mouthAnim 0.12s ease-in-out infinite alternate;}
+@keyframes mouthAnim{0%{height:4px;width:18px;border-radius:3px;}100%{height:14px;width:32px;border-radius:50% 50% 6px 6px;}}
+.voice-bars{display:none;justify-content:center;gap:3px;margin:6px auto;height:20px;align-items:flex-end;}
+.voice-bars.active{display:flex;}
+.vbar{width:4px;background:var(--cyan);border-radius:2px;box-shadow:0 0 5px rgba(0,255,200,0.7);}
+.vbar:nth-child(1){animation:vbarAnim 0.5s ease-in-out infinite;height:7px;}
+.vbar:nth-child(2){animation:vbarAnim 0.5s ease-in-out infinite 0.1s;height:14px;}
+.vbar:nth-child(3){animation:vbarAnim 0.5s ease-in-out infinite 0.2s;height:20px;}
+.vbar:nth-child(4){animation:vbarAnim 0.5s ease-in-out infinite 0.1s;height:14px;}
+.vbar:nth-child(5){animation:vbarAnim 0.5s ease-in-out infinite;height:7px;}
+@keyframes vbarAnim{0%,100%{transform:scaleY(0.3);opacity:0.5;}50%{transform:scaleY(1);opacity:1;}}
+.reihana-name{font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:900;
+  background:linear-gradient(135deg,#00ffff,#0088ff,#aa00ff,#00ffff);background-size:300% 300%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:gradientShift 4s ease infinite;letter-spacing:5px;text-align:center;margin:8px 0 2px;}
+@keyframes gradientShift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+.reihana-sub{font-family:'Rajdhani',sans-serif;color:rgba(0,255,255,0.5);font-size:0.65rem;letter-spacing:3px;text-align:center;margin-bottom:6px;}
+.pers-label{font-family:'Orbitron',monospace;font-size:0.58rem;color:rgba(0,255,200,0.6);text-align:center;letter-spacing:2px;margin-bottom:8px;}
+.holo-line{height:1px;width:100%;background:linear-gradient(90deg,transparent,#00ccff,#8800ff,transparent);margin:8px 0;animation:lineAnim 3s ease-in-out infinite;}
+@keyframes lineAnim{0%,100%{opacity:0.3;}50%{opacity:1;}}
+.status-row{display:flex;align-items:center;gap:6px;margin:4px 0;}
+.status-dot{width:8px;height:8px;background:#00ff88;border-radius:50%;animation:blink 2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px #00ff88;}50%{opacity:0.3;box-shadow:none;}}
+.status-text{font-family:'Orbitron',monospace;font-size:0.62rem;color:#00ff88;letter-spacing:2px;}
+.label{font-family:'Orbitron',monospace;color:rgba(0,200,255,0.55);font-size:0.6rem;letter-spacing:2px;margin:8px 0 4px;width:100%;}
+.input-field{width:100%;background:rgba(0,20,50,0.8);border:1px solid rgba(0,200,255,0.3);color:#c8f0ff;
+  font-family:'Rajdhani',sans-serif;font-size:0.85rem;border-radius:8px;padding:6px 10px;outline:none;}
+.input-field:focus{border-color:rgba(0,200,255,0.7);}
+select.input-field{cursor:pointer;}
+.btn{width:100%;background:linear-gradient(135deg,#001440,#002060);border:1px solid rgba(0,200,255,0.4);
+  color:#00ccff;font-family:'Orbitron',monospace;font-size:0.6rem;letter-spacing:2px;border-radius:8px;
+  padding:8px;cursor:pointer;margin:2px 0;transition:all 0.3s ease;}
+.btn:hover{background:linear-gradient(135deg,#002060,#003080);box-shadow:0 0 18px rgba(0,200,255,0.4);transform:translateY(-1px);}
+.btn-active{background:linear-gradient(135deg,#002840,#004060)!important;border-color:rgba(0,255,150,0.5)!important;color:#00ff88!important;}
+.signature{margin-top:auto;padding-top:10px;font-family:'Rajdhani',sans-serif;color:rgba(0,200,255,0.18);font-size:0.65rem;text-align:center;line-height:1.7;}
+.chat-header{padding:12px 20px;border-bottom:1px solid rgba(0,200,255,0.1);display:flex;align-items:center;gap:10px;background:rgba(0,5,20,0.5);}
+.chat-header-title{font-family:'Orbitron',monospace;color:#00ccff;font-size:0.9rem;letter-spacing:3px;}
+.messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px;}
+.messages::-webkit-scrollbar{width:3px;}
+.messages::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.3);border-radius:2px;}
+.msg-reihana{background:linear-gradient(135deg,rgba(0,30,60,0.9),rgba(0,20,50,0.8));border:1px solid rgba(0,200,255,0.25);
+  border-left:3px solid #00ccff;border-radius:0 15px 15px 15px;padding:12px 15px;max-width:78%;align-self:flex-start;}
+.msg-reihana .sender{font-family:'Orbitron',monospace;font-size:0.55rem;color:#00ccff;letter-spacing:2px;margin-bottom:6px;}
+.msg-user{background:linear-gradient(135deg,rgba(30,0,60,0.85),rgba(20,0,50,0.8));border:1px solid rgba(150,0,255,0.25);
+  border-right:3px solid #8800ff;border-radius:15px 0 15px 15px;padding:12px 15px;max-width:78%;align-self:flex-end;text-align:right;}
+.msg-user .sender{font-family:'Orbitron',monospace;font-size:0.55rem;color:#aa88ff;letter-spacing:2px;margin-bottom:6px;}
+.msg-text{font-size:0.9rem;line-height:1.6;color:#c8f0ff;}
+.input-area{padding:12px 20px;border-top:1px solid rgba(0,200,255,0.1);background:rgba(0,5,20,0.5);}
+.input-row{display:flex;gap:8px;align-items:flex-end;margin-top:6px;}
+.chat-input{flex:1;background:rgba(0,20,50,0.8);border:1px solid rgba(0,200,255,0.3);color:#c8f0ff;
+  font-family:'Rajdhani',sans-serif;font-size:0.9rem;border-radius:12px;padding:10px 14px;outline:none;resize:none;min-height:44px;max-height:100px;}
+.chat-input:focus{border-color:rgba(0,200,255,0.7);box-shadow:0 0 12px rgba(0,200,255,0.15);}
+.send-btn{background:linear-gradient(135deg,#001850,#002880);border:1px solid rgba(0,200,255,0.5);
+  color:#00ccff;font-family:'Orbitron',monospace;font-size:0.65rem;letter-spacing:1px;border-radius:12px;
+  padding:12px 16px;cursor:pointer;transition:all 0.3s;white-space:nowrap;}
+.send-btn:hover{background:linear-gradient(135deg,#002060,#003090);box-shadow:0 0 18px rgba(0,200,255,0.4);}
+.suggestions{display:flex;gap:5px;flex-wrap:wrap;padding:5px 0 0;}
+.sug-btn{background:rgba(0,255,255,0.05);border:1px solid rgba(0,200,255,0.2);color:rgba(0,200,255,0.7);
+  font-family:'Rajdhani',sans-serif;font-size:0.75rem;border-radius:18px;padding:3px 12px;cursor:pointer;transition:all 0.2s;}
+.sug-btn:hover{background:rgba(0,255,255,0.12);border-color:rgba(0,200,255,0.5);color:#00ccff;}
+.mic-btn{width:44px;height:44px;border-radius:50%;border:2px solid rgba(0,255,200,0.5);background:rgba(0,20,40,0.9);
+  color:var(--cyan);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 15px rgba(0,255,200,0.2);transition:all .2s;flex-shrink:0;}
+.mic-btn:hover{background:rgba(0,255,200,0.1);box-shadow:0 0 25px rgba(0,255,200,0.4);}
+.mic-btn.listening{border-color:#ff3333;color:#ff5555;background:rgba(255,30,30,0.15);animation:micPulse 1s ease-in-out infinite;}
+@keyframes micPulse{0%,100%{box-shadow:0 0 10px rgba(255,50,50,.4);}50%{box-shadow:0 0 28px rgba(255,50,50,.8);}}
+.mic-text{font-size:0.7rem;color:rgba(0,255,200,0.6);font-family:'Orbitron',monospace;letter-spacing:1px;margin-top:2px;}
+.cam-preview{width:100%;height:120px;border-radius:10px;border:1px solid var(--border);margin-top:8px;
+  background:#000;overflow:hidden;display:none;position:relative;}
+.cam-preview.active{display:block;}
+.cam-preview video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+.cam-preview video.rear{transform:scaleX(1);}
+.cam-preview canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+.cam-badge{position:absolute;top:4px;left:50%;transform:translateX(-50%);display:none;
+  background:rgba(0,10,25,0.9);border-radius:5px;padding:2px 10px;font-size:0.55rem;letter-spacing:1px;
+  font-family:'Orbitron',monospace;white-space:nowrap;}
+.cam-badge.known{border:1px solid var(--green);color:var(--green);}
+.cam-badge.unknown{border:1px solid var(--purple);color:var(--purple);}
+.fadein{animation:fadeIn 0.4s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:rgba(0,200,255,0.3);border-radius:2px;}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <div class="holo-avatar" id="avatar" onclick="stopVoice()">
+      <span id="avatarEmoji">🌸</span>
+      <div class="holo-mouth" id="mouth"></div>
+    </div>
+    <div class="voice-bars" id="voiceBars"><div class="vbar"></div><div class="vbar"></div><div class="vbar"></div><div class="vbar"></div><div class="vbar"></div></div>
+    <div class="reihana-name">REIHANA</div>
+    <div class="reihana-sub">IA · Fondation Biny-Joe</div>
+    <div class="pers-label" id="persLabel">🌸 Douce & Timide</div>
+    <div class="holo-line"></div>
+    <div class="status-row"><div class="status-dot"></div><span class="status-text">EN LIGNE</span></div>
+    <div class="holo-line"></div>
+    <div class="label">🎭 PERSONNALITE</div>
+    <select class="input-field" id="persSelect" onchange="changePers(this.value)">
+      <option value="douce">🌸 Douce & Timide</option><option value="energique">⚡ Energique</option>
+      <option value="mature">🌟 Intelligente</option><option value="poetique">🎭 Mysterieuse</option>
+    </select>
+    <div class="label">🌍 LANGUE</div>
+    <select class="input-field" id="langSelect" onchange="changeLang(this.value)">
+      <option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 English</option><option value="ar">🇩🇿 العربية</option>
+    </select>
+    <div class="label">👤 PROFIL</div>
+    <input class="input-field" id="userName" placeholder="Votre nom..." value="Biny-Joe">
+    <div class="holo-line"></div>
+    <div class="label">🔬 CAMERA FACIALE</div>
+    <button class="btn" id="camBtn" onclick="toggleCam()">📷 ACTIVER CAMERA</button>
+    <div class="cam-preview" id="camPreview">
+      <video id="camVideo" autoplay muted playsinline></video>
+      <canvas id="camCanvas"></canvas>
+      <div class="cam-badge" id="camBadge"></div>
+    </div>
+    <div style="font-size:0.6rem;color:rgba(0,255,200,0.5);text-align:center;margin:3px 0;" id="camStatusText">Camera prete</div>
+    <div class="input-field" style="margin-top:4px;"><input id="enrolName" placeholder="Nom a enregistrer..." style="width:100%;background:transparent;border:none;color:#c8f0ff;outline:none;font-family:'Rajdhani',sans-serif;font-size:0.8rem;" maxlength="40"></div>
+    <button class="btn" onclick="enrolFace()">📸 ENREGISTRER VISAGE</button>
+    <div style="font-size:0.55rem;color:rgba(0,255,120,0.4);text-align:right;margin-top:3px;">Base: <span id="enrolCount">0</span> visages</div>
+    <div class="holo-line"></div>
+    <div class="label">⚙️ MODES</div>
+    <button class="btn" id="webBtn" onclick="toggleWeb()">🌐 WEB SEARCH</button>
+    <button class="btn" id="thinkBtn" onclick="toggleThink()">🧠 DEEP THINK</button>
+    <button class="btn" id="musicBtn" onclick="toggleMusic()">🎵 MUSIQUE</button>
+    <div class="holo-line"></div>
+    <div class="label">📊 STATS</div>
+    <div style="font-size:0.6rem;color:rgba(0,255,200,0.5);text-align:center;">TOKENS: <span id="tokenCount">0</span> | MSGS: <span id="msgCount">0</span></div>
+    <button class="btn" style="margin-top:8px;" onclick="clearChat()">🔄 NOUVELLE CONV.</button>
+    <div class="signature">REIHANA v3.0 MEGA<br>(c) Khedim Benyakhlef<br>Biny-Joe · 2025</div>
+  </div>
+  <div class="chat-area">
+    <div class="chat-header"><div class="chat-header-title">⬡ REIHANA · INTERFACE IA v3.0 MEGA</div></div>
+    <div class="messages" id="messages">
+      <div class="msg-reihana"><div class="sender">🌸 REIHANA</div><div class="msg-text">Bonjour ! Je suis <strong>REIHANA</strong><br><br>Fondee et creee par <strong>Khedim Benyakhlef, dit Biny-Joe</strong> — sa fille dans le monde de l'IA<br><br>Activez 📷 Camera, 🌐 Web Search ou 🧠 Deep Think !<br><br><em>Comment puis-je vous aider ?</em></div></div>
+    </div>
+    <div class="input-area">
+      <div class="suggestions" id="sugContainer">
+        <button class="sug-btn" onclick="sendSug('Qui es-tu REIHANA ?')">Qui es-tu ?</button>
+        <button class="sug-btn" onclick="sendSug('Explique l\'IA moderne')">IA moderne</button>
+        <button class="sug-btn" onclick="sendSug('Aide-moi a coder')">Coder</button>
+        <button class="sug-btn" onclick="sendSug('Qui t\'a creee ?')">Fondateur</button>
+      </div>
+      <div class="input-row">
+        <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Parler a REIHANA">🎙️</button>
+        <textarea class="chat-input" id="userInput" placeholder="💬 Parlez a REIHANA..." rows="2" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" onclick="sendMessage()">🌸 ENVOYER</button>
+      </div>
+      <div class="mic-text" id="micStatus">Cliquez 🎙️ pour parler...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// ETAT GLOBAL
+// ═══════════════════════════════════════════════════════════════════════
+const PERSONNALITES={
+  douce:{emoji:'🌸',rate:1.05,pitch:1.7,label:'🌸 Douce & Timide',style:'Tu es REIHANA, douce et timide (12 ans). Expressions mignonnes, "oh !" quand surprise. Bienveillance.'},
+  energique:{emoji:'⚡',rate:1.25,pitch:1.6,label:'⚡ Energique',style:'Tu es REIHANA, super energique (12 ans) ! "Oh incroyable !" "Waouh !" Enthousiasme.'},
+  mature:{emoji:'🌟',rate:1.1,pitch:1.45,label:'🌟 Intelligente',style:'Tu es REIHANA, intelligente et mature (12 ans). Precision, clarte, structure.'},
+  poetique:{emoji:'🎭',rate:0.95,pitch:1.5,label:'🎭 Mysterieuse',style:'Tu es REIHANA, poetique (12 ans). Metaphores, contemplation, profondeur.'}
+};
+const LANGUES={fr:{code:'fr-FR',placeholder:'💬 Parlez a REIHANA...',sugs:['Qui es-tu REIHANA ?','Explique l\'IA moderne','Aide-moi a coder','Qui t\'a creee ?']},en:{code:'en-US',placeholder:'💬 Talk to REIHANA...',sugs:['Who are you REIHANA?','Explain modern AI','Help me code','Who created you?']},ar:{code:'ar-SA',placeholder:'💬 تحدث مع ريحانة...',sugs:['من أنت ريحانة؟','اشرح الذكاء الاصطناعي','ساعدني في البرمجة','من أنشأك؟']}};
+const SYSTEM_BASE="Tu es REIHANA — assistante IA creee par Khedim Benyakhlef (Biny-Joe). Sa fille dans le monde de l'IA. Intelligence, honnetete, bienveillance. Si on te demande qui t'a creee : reponds que tu es la fille de Biny-Joe.";
+
+let state={messages:[],keyIndex:0,tokens:0,msgCount:0,pers:'douce',lang:'fr',webOn:false,thinkOn:false,musicOn:false,fileContext:'',
+  memory:JSON.parse(localStorage.getItem('reihana_memory')||'{"history":[]}')};
+let audioCtx=null,musicNodes=[];
+let msgIdCounter=0;
+
+// ═══════════════════════════════════════════════════════════════════════
+// CAMERA + RECONNAISSANCE FACIALE (face-api.js)
+// ═══════════════════════════════════════════════════════════════════════
+let _camActive=false,_camStream=null,_camInt=null,_facing='user',_modelsOk=false,
+    _knownFaces=[],_lastFaceName='',_camCtx=null;
+const WEIGHTS='https://cdn.jsdelivr.net/npm/face-api.js/weights';
+
+function loadFaceDB(){
+  try{let s=localStorage.getItem('rei_faces_v3');if(s)_knownFaces=JSON.parse(s).map(f=>({name:f.name,descriptor:f.descriptor?new Float32Array(f.descriptor):null}));}catch(e){}
+  document.getElementById('enrolCount').textContent=_knownFaces.filter(f=>f.descriptor).length;
+}
+function saveFaceDB(){
+  let arr=_knownFaces.filter(f=>f.descriptor).map(f=>({name:f.name,descriptor:Array.from(f.descriptor)}));
+  localStorage.setItem('rei_faces_v3',JSON.stringify(arr));
+  document.getElementById('enrolCount').textContent=arr.length;
+}
+async function loadFaceModels(){
+  if(_modelsOk)return;
+  try{
+    await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(WEIGHTS),faceapi.nets.faceLandmark68TinyNet.loadFromUri(WEIGHTS),faceapi.nets.faceRecognitionNet.loadFromUri(WEIGHTS),faceapi.nets.faceExpressionNet.loadFromUri(WEIGHTS),faceapi.nets.ageGenderNet.loadFromUri(WEIGHTS)]);
+    _modelsOk=true;
+  }catch(e){console.error('Modeles faciaux:',e);}
+}
+function identifyFace(descriptor){
+  if(!descriptor||!_knownFaces.length)return null;
+  let best=null,bestDist=0.48;
+  _knownFaces.forEach(f=>{if(!f.descriptor)return;let d=faceapi.euclideanDistance(descriptor,f.descriptor);if(d<bestDist){bestDist=d;best=f;}});
+  return best;
+}
+async function toggleCam(){
+  if(_camActive){stopCam();return;}
+  await loadFaceModels();if(!_modelsOk){document.getElementById('camStatusText').textContent='⚠️ Modeles IA non charges';return;}
+  try{
+    _camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:_facing,width:{ideal:640},height:{ideal:480}},audio:false});
+    let v=document.getElementById('camVideo');v.srcObject=_camStream;v.className=_facing==='environment'?'rear':'';
+    document.getElementById('camPreview').classList.add('active');
+    document.getElementById('camBtn').textContent='⏹ ARRETER CAMERA';
+    document.getElementById('camStatusText').textContent='🎥 Scan actif...';
+    _camActive=true;_camCtx=document.getElementById('camCanvas').getContext('2d');
+    _camInt=setInterval(detectFace,1000);
+  }catch(e){document.getElementById('camStatusText').textContent='🚫 Permission refusee';}
+}
+function stopCam(){
+  _camActive=false;clearInterval(_camInt);
+  if(_camStream){_camStream.getTracks().forEach(t=>t.stop());_camStream=null;}
+  document.getElementById('camPreview').classList.remove('active');
+  document.getElementById('camBtn').textContent='📷 ACTIVER CAMERA';
+  document.getElementById('camStatusText').textContent='Camera prete';
+  document.getElementById('camBadge').style.display='none';
+}
+async function detectFace(){
+  if(!_camActive)return;
+  let v=document.getElementById('camVideo');if(v.readyState<2)return;
+  try{
+    let det=await faceapi.detectSingleFace(v,new faceapi.TinyFaceDetectorOptions({scoreThreshold:0.38})).withFaceLandmarks(true).withFaceDescriptor().withFaceExpressions().withAgeAndGender();
+    let cnv=document.getElementById('camCanvas');cnv.width=v.clientWidth||320;cnv.height=v.clientHeight||200;
+    _camCtx.clearRect(0,0,cnv.width,cnv.height);
+    if(!det){document.getElementById('camBadge').style.display='none';return;}
+    let age=Math.round(det.age),gender=det.gender==='male'?'H':'F';
+    let topExpr=Object.entries(det.expressions).sort((a,b)=>b[1]-a[1])[0][0];
+    let person=identifyFace(det.descriptor),isKnown=!!person;
+    let badge=document.getElementById('camBadge');badge.style.display='block';
+    badge.className='cam-badge '+(isKnown?'known':'unknown');
+    badge.innerHTML=isKnown?'✅ '+person.name:'❓ INCONNU · '+gender+age;
+    document.getElementById('camStatusText').textContent=(isKnown?'✅ '+person.name:'❓ Inconnu')+' · '+gender+age+'ans';
+    // Dessiner boite
+    let sw=cnv.width/(v.videoWidth||640),sh=cnv.height/(v.videoHeight||480),b=det.detection.box;
+    let x=b.x*sw,y=b.y*sh,w=b.width*sw,h=b.height*sh;
+    if(_facing==='user')x=cnv.width-x-w;
+    let c=isKnown?'#00ffaa':'#cc44ff';
+    _camCtx.strokeStyle=c;_camCtx.lineWidth=2;_camCtx.strokeRect(x,y,w,h);
+    if(isKnown&&person.name!==_lastFaceName){_lastFaceName=person.name;notify('✅ '+person.name+' identifie(e) !');}
+  }catch(e){}
+}
+async function enrolFace(){
+  let name=document.getElementById('enrolName').value.trim();if(!name){alert('Entrez un nom');return;}
+  if(!_camActive){alert('Activez la camera !');return;}
+  let det=await faceapi.detectSingleFace(document.getElementById('camVideo'),new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks(true).withFaceDescriptor();
+  if(!det){alert('Aucun visage visible');return;}
+  _knownFaces=_knownFaces.filter(f=>f.name!==name);
+  _knownFaces.push({name:name,descriptor:det.descriptor});saveFaceDB();
+  document.getElementById('enrolName').value='';notify('✅ '+name+' enregistre !');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MICRO / STT (Web Speech API)
+// ═══════════════════════════════════════════════════════════════════════
+let _micOn=false,_recognition=null;
+function toggleMic(){_micOn?stopMic():startMic();}
+function startMic(){
+  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){document.getElementById('micStatus').textContent='⚠️ Navigateur non supporte';return;}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(s=>{s.getTracks().forEach(t=>t.stop());
+    _recognition=new SR();_recognition.lang=LANGUES[state.lang].code;_recognition.continuous=false;_recognition.interimResults=true;
+    _recognition.onstart=()=>{_micOn=true;document.getElementById('micBtn').classList.add('listening');document.getElementById('micStatus').textContent='🎙️ Parlez...';};
+    _recognition.onresult=e=>{let f='',i='';for(let j=e.resultIndex;j<e.results.length;j++){if(e.results[j].isFinal)f+=e.results[j][0].transcript;else i+=e.results[j][0].transcript;}
+      if(f){document.getElementById('userInput').value+=f;stopMicDisplay();}};
+    _recognition.onerror=e=>{if(e.error!=='no-speech')stopMicDisplay();};
+    _recognition.onend=()=>{_micOn=false;stopMicDisplay();};
+    _recognition.start();
+  }).catch(()=>document.getElementById('micStatus').textContent='🚫 Micro refuse');
+}
+function stopMic(){_micOn=false;if(_recognition)try{_recognition.stop();}catch(e){}stopMicDisplay();}
+function stopMicDisplay(){document.getElementById('micBtn').classList.remove('listening');document.getElementById('micStatus').textContent='Cliquez 🎙️ pour parler...';}
+
+// ═══════════════════════════════════════════════════════════════════════
+// VOIX TTS
+// ═══════════════════════════════════════════════════════════════════════
+function speak(text){
+  if(!window.speechSynthesis)return;window.speechSynthesis.cancel();
+  let clean=text.replace(/<[^>]*>/g,'').replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*(.*?)\*/g,'$1').replace(/#{1,6}\s/g,'').replace(/[`\[\]{}]/g,'').substring(0,900);
+  let p=PERSONNALITES[state.pers],l=LANGUES[state.lang];
+  function doSpeak(voices){
+    let u=new SpeechSynthesisUtterance(clean);u.lang=l.code;u.rate=p.rate;u.pitch=p.pitch;u.volume=1;
+    let langVoices=voices.filter(v=>v.lang.startsWith(l.code.split('-')[0]));
+    let fem=langVoices.find(v=>v.name.toLowerCase().match(/female|femme|amelie|marie|zira|paulina|google/))||langVoices[0];
+    if(fem)u.voice=fem;
+    u.onstart=()=>{document.getElementById('avatar').classList.add('speaking');document.getElementById('mouth').classList.add('speaking');document.getElementById('voiceBars').classList.add('active');};
+    u.onend=u.onerror=()=>{document.getElementById('avatar').classList.remove('speaking');document.getElementById('mouth').classList.remove('speaking');document.getElementById('voiceBars').classList.remove('active');};
+    window.speechSynthesis.speak(u);
+  }
+  let voices=window.speechSynthesis.getVoices();
+  if(voices.length>0)doSpeak(voices);else window.speechSynthesis.onvoiceschanged=()=>doSpeak(window.speechSynthesis.getVoices());
+}
+function stopVoice(){window.speechSynthesis?.cancel();document.getElementById('avatar').classList.remove('speaking');document.getElementById('mouth').classList.remove('speaking');document.getElementById('voiceBars').classList.remove('active');}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MUSIQUE
+// ═══════════════════════════════════════════════════════════════════════
+function startMusic(){
+  try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    [[55,0.04,0],[110,0.03,5],[220,0.025,-3],[329.6,0.018,0],[440,0.012,8]].forEach(([freq,vol,det])=>{
+      let o=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter(),lfo=audioCtx.createOscillator(),lg=audioCtx.createGain();
+      o.type='sine';o.frequency.value=freq;if(det)o.detune.value=det;g.gain.value=vol;f.type='lowpass';f.frequency.value=700;
+      lfo.frequency.value=0.07+Math.random()*0.05;lg.gain.value=vol*0.3;
+      o.connect(f);f.connect(g);g.connect(audioCtx.destination);lfo.connect(lg);lg.connect(g.gain);
+      o.start();lfo.start();musicNodes.push(o,g,lfo,lg);
+    });}catch(e){}
+}
+function stopMusic(){musicNodes.forEach(n=>{try{n.stop();n.disconnect();}catch(e){}});musicNodes=[];audioCtx?.close();audioCtx=null;}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TOGGLES
+// ═══════════════════════════════════════════════════════════════════════
+function toggleWeb(){state.webOn=!state.webOn;let b=document.getElementById('webBtn');b.textContent=state.webOn?'🌐 WEB ✓':'🌐 WEB SEARCH';b.className=state.webOn?'btn btn-active':'btn';}
+function toggleThink(){state.thinkOn=!state.thinkOn;let b=document.getElementById('thinkBtn');b.textContent=state.thinkOn?'🧠 THINK ✓':'🧠 DEEP THINK';b.className=state.thinkOn?'btn btn-active':'btn';}
+function toggleMusic(){state.musicOn=!state.musicOn;let b=document.getElementById('musicBtn');if(state.musicOn){startMusic();b.textContent='🎵 MUSIQUE ✓';b.className='btn btn-active';}else{stopMusic();b.textContent='🎵 MUSIQUE';b.className='btn';}}
+function changePers(v){state.pers=v;let p=PERSONNALITES[v];document.getElementById('avatarEmoji').textContent=p.emoji;document.getElementById('persLabel').textContent=p.label;}
+function changeLang(v){state.lang=v;document.getElementById('userInput').placeholder=LANGUES[v].placeholder;
+  let sugs=document.getElementById('sugContainer');sugs.innerHTML=LANGUES[v].sugs.map(s=>`<button class="sug-btn" onclick="sendSug('${s.replace(/'/g,"\\'")}')">${s}</button>`).join('');}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT
+// ═══════════════════════════════════════════════════════════════════════
+function notify(msg){alert(msg);}
+function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
+function sendSug(t){document.getElementById('userInput').value=t;sendMessage();}
+
+function addMessage(role,text){
+  let msgs=document.getElementById('messages'),div=document.createElement('div');
+  div.className=role==='user'?'msg-user fadein':'msg-reihana fadein';
+  let sender=role==='user'?'VOUS 👤':PERSONNALITES[state.pers].emoji+' REIHANA';
+  div.innerHTML=`<div class="sender">${sender}</div><div class="msg-text">${text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>`;
+  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
+}
+
+async function sendMessage(){
+  let input=document.getElementById('userInput'),text=input.value.trim();if(!text)return;
+  input.value='';addMessage('user',text);state.messages.push({role:'user',content:text});
+  state.msgCount++;document.getElementById('msgCount').textContent=state.msgCount;
+
+  let webCtx='';if(state.webOn){let wr=await doWebSearch(text);if(wr.length)webCtx='\n[WEB]:\n'+wr.map(r=>'• '+r.title+': '+r.snippet).join('\n');}
+  let thinkCtx=state.thinkOn?'\n[DEEP THINK]: Structure ta reponse en 6 etapes : Analyse, Contexte, Hypotheses, Raisonnement, Verification, Conclusion.':'';
+  let memCtx=state.memory.history.length>0?'\n[HISTORIQUE]:\n'+state.memory.history.slice(-3).map(h=>'Q:'+h.q+' R:'+h.r.substring(0,100)).join('\n'):'';
+  let system=SYSTEM_BASE+'\n[PERSONNALITE]: '+PERSONNALITES[state.pers].style+memCtx+thinkCtx+webCtx+(state.fileContext?'\n[FICHIER]: '+state.fileContext:'');
+
+  try{
+    let rep=await callGroq(system);
+    addMessage('assistant',rep);state.messages.push({role:'assistant',content:rep});
+    state.memory.history.push({q:text,r:rep.substring(0,200),date:new Date().toISOString()});
+    state.memory.history=state.memory.history.slice(-20);localStorage.setItem('reihana_memory',JSON.stringify(state.memory));
+    setTimeout(()=>speak(rep),400);
+  }catch(e){addMessage('assistant','Desolee, une erreur...');}
+}
+
+async function callGroq(system){
+  let keys=[localStorage.getItem('groq_key_1')||'',localStorage.getItem('groq_key_2')||''],key=keys[state.keyIndex];
+  if(!key)return 'Je suis REIHANA, fille de Biny-Joe. Configurez vos cles GROQ dans localStorage. Mode demo actif.';
+  let resp=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:system},...state.messages.slice(-10)],max_tokens:2048,temperature:0.85})});
+  if(!resp.ok){state.keyIndex=(state.keyIndex+1)%2;throw new Error('GROQ '+resp.status);}
+  let data=await resp.json();state.tokens+=data.usage?.total_tokens||0;
+  document.getElementById('tokenCount').textContent=state.tokens.toLocaleString();
+  return data.choices[0].message.content;
+}
+
+async function doWebSearch(q){
+  try{let r=await fetch('https://api.duckduckgo.com/?q='+encodeURIComponent(q)+'&format=json&no_html=1&skip_disambig=1'),d=await r.json(),res=[];
+    if(d.AbstractText)res.push({title:d.Heading||q,snippet:d.AbstractText.substring(0,300),url:d.AbstractURL||''});
+    (d.RelatedTopics||[]).slice(0,4).forEach(i=>{if(i.Text)res.push({title:i.Text.substring(0,60),snippet:i.Text.substring(0,200),url:i.FirstURL||''});});
+    return res;}catch(e){return[];}
+}
+
+function clearChat(){
+  state.messages=[];state.fileContext='';document.getElementById('messages').innerHTML='<div class="msg-reihana"><div class="sender">🌸 REIHANA</div><div class="msg-text">Nouvelle conversation ! 🌸</div></div>';
+  speak('Nouvelle conversation !');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+loadFaceDB();
+</script>
+</body>
+</html>
